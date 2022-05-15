@@ -233,7 +233,6 @@ public:
  -- ** -- P U B L I C   D A T A -----------------------------------------------
 	*/
 
-	bool ruler_status= true;
 	// used in renderer_ducks.cpp
 	bool solid_lines;
 
@@ -350,12 +349,10 @@ public:
 
 	void refresh_dimension_info();
 
-	void show_ruler();
 	//! Enables showing of the grid
 	void enable_grid();
 	//! Disables showing of the grid
 	void disable_grid();
-
 	//! Toggles the showing of the grid
 	void toggle_grid();
 	//! Returns the state of the show_grid flag
