@@ -85,7 +85,14 @@ public:
 
 	std::string get_binary_path() const;
 
-	void set_binary_path(const std::string& path);
+	/**
+	 * In the improbable case Synfig is unable to retrieve the current process filepath,
+	 * use this instead.
+	 * @param path the fallback to the binary path (UTF-8 encoding)
+	 *
+	 * @see synfig::OS::get_binary_path()
+	 */
+	void set_fallback_binary_path(const std::string& path);
 
 	size_t get_threads() const;
 
@@ -103,6 +110,10 @@ public:
 
 	void set_should_print_benchmarks(bool print_benchmarks);
 
+	int get_repeats() const;
+
+	void set_repeats(int repeats);
+
 private:
 	SynfigToolGeneralOptions();
 	std::string _binary_path;
@@ -110,6 +121,8 @@ private:
 	size_t _threads;
 	bool _should_be_quiet,
 		 _should_print_benchmarks;
+
+	int _repeats;
 };
 
 #endif

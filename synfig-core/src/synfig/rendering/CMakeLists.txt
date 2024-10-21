@@ -1,9 +1,8 @@
-target_sources(synfig
+target_sources(libsynfig
     PRIVATE
         "${CMAKE_CURRENT_LIST_DIR}/optimizer.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/renderer.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/renderqueue.cpp"
-        "${CMAKE_CURRENT_LIST_DIR}/resource.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/surface.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/task.cpp"
 )

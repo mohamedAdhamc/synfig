@@ -56,10 +56,6 @@ using namespace studio;
 
 /* === M A C R O S ========================================================= */
 
-#ifndef IMAGE_EXT
-#	define IMAGE_EXT	"png"
-#endif
-
 /* === G L O B A L S ======================================================= */
 
 /* === P R O C E D U R E S ================================================= */
@@ -213,7 +209,7 @@ Dockable::set_toolbar(Gtk::Toolbar& toolbar)
 }
 
 Gtk::ToolButton*
-Dockable::add_button(const Gtk::StockID& stock_id, const synfig::String& tooltip)
+Dockable::add_button(const std::string& icon_name, const synfig::String& tooltip)
 {
 	if (!toolbar_container) reset_toolbar();
 	Gtk::Toolbar *toolbar = dynamic_cast<Gtk::Toolbar*>(toolbar_container->get_child());
@@ -222,7 +218,8 @@ Dockable::add_button(const Gtk::StockID& stock_id, const synfig::String& tooltip
 		set_toolbar(*toolbar);
 	}
 
-	Gtk::ToolButton* ret(manage(new Gtk::ToolButton(stock_id)));
+	Gtk::ToolButton* ret(manage(new Gtk::ToolButton()));
+	ret->set_icon_name(icon_name);
 	ret->set_tooltip_text(tooltip);
 	ret->show();
 	toolbar->set_has_tooltip();
@@ -249,7 +246,7 @@ Dockable::reset_container()
 	//App::process_all_events();
 	// Update:
 	// Seems bug in other place, process_all_events() here produces
-	// a concurrent event processing and collissions
+	// a concurrent event processing and collisions
 }
 
 void

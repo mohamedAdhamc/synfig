@@ -57,19 +57,14 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 using namespace studio;
 
 /* === M A C R O S ========================================================= */
 
 #ifndef LAYER_CREATION
-#define LAYER_CREATION(button, stockid, tooltip)	\
-	{ \
-		Gtk::Image *icon = manage(new Gtk::Image(Gtk::StockID(stockid), \
-			Gtk::ICON_SIZE_SMALL_TOOLBAR)); \
-		button.add(*icon); \
-	} \
+#define LAYER_CREATION(button, icon_name, tooltip)	\
+	button.set_image_from_icon_name(icon_name, Gtk::BuiltinIconSize::ICON_SIZE_SMALL_TOOLBAR); \
 	button.set_relief(Gtk::RELIEF_NONE); \
 	button.set_tooltip_text(tooltip); \
 	button.signal_toggled().connect(sigc::mem_fun(*this, \
@@ -86,7 +81,7 @@ StateText studio::state_text;
 
 class studio::StateText_Context
 {
-	etl::handle<CanvasView> canvas_view;
+	CanvasView::Handle canvas_view;
 	CanvasView::IsWorking is_working;
 
 	Duckmatic::Push duckmatic_push;
@@ -171,7 +166,7 @@ public:
 	StateText_Context(CanvasView *canvas_view);
 	~StateText_Context();
 
-	const etl::handle<CanvasView>& get_canvas_view()const{return canvas_view;}
+	const CanvasView::Handle& get_canvas_view()const{return canvas_view;}
 	etl::handle<synfigapp::CanvasInterface> get_canvas_interface()const{return canvas_view->canvas_interface();}
 	WorkArea * get_work_area()const{return canvas_view->get_work_area();}
 
@@ -198,7 +193,7 @@ public:
 /* === M E T H O D S ======================================================= */
 
 StateText::StateText():
-	Smach::state<StateText_Context>("text")
+	Smach::state<StateText_Context>("text", N_("Text Tool"))
 {
 	insert(event_def(EVENT_LAYER_SELECTION_CHANGED,&StateText_Context::event_layer_selection_changed_handler));
 	insert(event_def(EVENT_STOP,&StateText_Context::event_stop_handler));
@@ -361,7 +356,7 @@ StateText_Context::StateText_Context(CanvasView *canvasView):
 	layer_types_label.set_valign(Gtk::ALIGN_CENTER);
 
 	LAYER_CREATION(layer_text_togglebutton,
-		("synfig-layer_other_text"), _("Create a text layer"));
+		"layer_other_text_icon", _("Create a text layer"));
 
 	layer_text_togglebutton.get_style_context()->add_class("indentation");
 	layer_types_box.pack_start(layer_text_togglebutton, false, false, 0);
@@ -372,7 +367,7 @@ StateText_Context::StateText_Context(CanvasView *canvasView):
 	blend_label.get_style_context()->add_class("gap");
 	blend_box.pack_start(blend_label, false, false, 0);
 
-	blend_enum.set_param_desc(ParamDesc(Color::BLEND_COMPOSITE,"blend_method")
+	blend_enum.set_param_desc(ParamDesc("blend_method")
 		.set_local_name(_("Blend Method"))
 		.set_description(_("Defines the blend method to be used for texts")));
 
@@ -553,10 +548,11 @@ StateText_Context::make_text(const Point& _point)
 	blend_param_value.set_static(true);
 
 	String text;
-	if (get_paragraph_flag())
-		App::dialog_paragraph(_("Text Paragraph"), _("Enter text here:"), text);
-	else
+	if (get_paragraph_flag()) {
+		if (!App::dialog_paragraph(_("Text Paragraph"), _("Enter text here:"), text)) return;
+	} else {
 		if (!App::dialog_entry(_("Input text"), _("Text: "), text, _("Cancel"), _("Ok"))) return;
+	}
 
 	egress_on_selection_change=false;
 	layer=get_canvas_interface()->add_layer_to("text",canvas,depth);

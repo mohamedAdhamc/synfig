@@ -50,7 +50,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Atan2, RELEASE_VERSION_0_61_08, "atan2", "aTan2")
+REGISTER_VALUENODE(ValueNode_Atan2, RELEASE_VERSION_0_61_08, "atan2", N_("aTan2"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -59,8 +59,7 @@ REGISTER_VALUENODE(ValueNode_Atan2, RELEASE_VERSION_0_61_08, "atan2", "aTan2")
 ValueNode_Atan2::ValueNode_Atan2(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	if (value.get_type() == type_angle)
 	{
 		set_link("x",ValueNode_Const::create(Angle::cos(value.get(Angle())).get()));
@@ -92,8 +91,8 @@ ValueNode_Atan2::~ValueNode_Atan2()
 ValueBase
 ValueNode_Atan2::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	return Angle::tan((*y_)(t).get(Real()),
 					  (*x_)(t).get(Real()));
@@ -139,12 +138,12 @@ ValueNode_Atan2::get_children_vocab_vfunc()const
 {
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"x")
+	ret.push_back(ParamDesc("x")
 		.set_local_name(_("X"))
 		.set_description(_("Cosine of the angle"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"y")
+	ret.push_back(ParamDesc("y")
 		.set_local_name(_("Y"))
 		.set_description(_("Sine of the angle"))
 	);

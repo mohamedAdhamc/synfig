@@ -50,7 +50,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Exp, RELEASE_VERSION_0_61_07, "exp", "Exponential")
+REGISTER_VALUENODE(ValueNode_Exp, RELEASE_VERSION_0_61_07, "exp", N_("Exponential"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -59,8 +59,7 @@ REGISTER_VALUENODE(ValueNode_Exp, RELEASE_VERSION_0_61_07, "exp", "Exponential")
 ValueNode_Exp::ValueNode_Exp(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	if (value.get_type() == type_real)
 	{
 		set_link("exp",ValueNode_Const::create(Real(0)));
@@ -92,7 +91,7 @@ ValueNode_Exp::~ValueNode_Exp()
 ValueBase
 ValueNode_Exp::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
+	if (DEBUG_GETENV("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
 		printf("%s:%d operator()\n", __FILE__, __LINE__);
 
 	return (exp((*exp_)(t).get(Real())) *
@@ -141,12 +140,12 @@ ValueNode_Exp::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"exp")
+	ret.push_back(ParamDesc("exp")
 		.set_local_name(_("Exponent"))
 		.set_description(_("The value to raise the constant 'e'"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"scale")
+	ret.push_back(ParamDesc("scale")
 		.set_local_name(_("Scale"))
 		.set_description(_("Multiplier of the resulting exponent"))
 	);

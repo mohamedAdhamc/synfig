@@ -51,10 +51,8 @@
 
 #endif
 
-using namespace etl;
 using namespace synfig;
 using namespace synfigapp;
-using namespace Action;
 
 /* === M A C R O S ========================================================= */
 
@@ -165,20 +163,19 @@ void Action::ValueDescExport::scan_canvas(synfig::Canvas::Handle prev_canvas, sy
 {
 	{ // scan children
 		std::list<Canvas::Handle> &children = canvas->children();
-		for(std::list<Canvas::Handle>::iterator i = children.begin(); i != children.end(); i++)
+		for (std::list<Canvas::Handle>::iterator i = children.begin(); i != children.end(); ++i)
 			scan_canvas(prev_canvas, new_canvas, *i);
 	}
 
 	{ // scan layers
-		for(IndependentContext i = canvas->get_independent_context(); *i; i++)
+		for (IndependentContext i = canvas->get_independent_context(); *i; ++i)
 			scan_layer(prev_canvas, new_canvas, *i);
 	}
 
 	{ // scan values
 		const ValueNodeList &value_node_list = canvas->value_node_list();
-		for(ValueNodeList::const_iterator i = value_node_list.begin(); i != value_node_list.end(); i++)
-		{
-			LinkableValueNode::Handle linkable_value_node = etl::handle<LinkableValueNode>::cast_dynamic(*i);
+		for (ValueNodeList::const_iterator i = value_node_list.begin(); i != value_node_list.end(); ++i) {
+			LinkableValueNode::Handle linkable_value_node = LinkableValueNode::Handle::cast_dynamic(*i);
 			if (linkable_value_node)
 				scan_linkable_value_node(prev_canvas, new_canvas, linkable_value_node);
 		}
@@ -189,8 +186,7 @@ void Action::ValueDescExport::scan_layer(synfig::Canvas::Handle prev_canvas, syn
 {
 	// dynamic params
 	const Layer::DynamicParamList &dynamic_param_list = layer->dynamic_param_list();
-	for(Layer::DynamicParamList::const_iterator i = dynamic_param_list.begin(); i != dynamic_param_list.end(); i++)
-	{
+	for (Layer::DynamicParamList::const_iterator i = dynamic_param_list.begin(); i != dynamic_param_list.end(); ++i) {
 		if (i->second->get_parent_canvas() == prev_canvas)
 		{
 			// create action
@@ -205,7 +201,7 @@ void Action::ValueDescExport::scan_layer(synfig::Canvas::Handle prev_canvas, syn
 
 		if (!i->second->get_parent_canvas())
 		{
-			LinkableValueNode::Handle linkable_value_node = etl::handle<LinkableValueNode>::cast_dynamic(i->second);
+			LinkableValueNode::Handle linkable_value_node = LinkableValueNode::Handle::cast_dynamic(i->second);
 			if (linkable_value_node)
 				scan_linkable_value_node(prev_canvas, new_canvas, linkable_value_node);
 		}
@@ -232,7 +228,7 @@ void Action::ValueDescExport::scan_linkable_value_node(synfig::Canvas::Handle pr
 			}
 			if (!link->get_parent_canvas())
 			{
-				LinkableValueNode::Handle sub_linkable_value_node = etl::handle<LinkableValueNode>::cast_dynamic(link);
+				LinkableValueNode::Handle sub_linkable_value_node = LinkableValueNode::Handle::cast_dynamic(link);
 				if (sub_linkable_value_node)
 					scan_linkable_value_node(prev_canvas, new_canvas, sub_linkable_value_node);
 			}
@@ -264,8 +260,7 @@ Action::ValueDescExport::prepare()
 		{
 			// clone value nodes
 			const ValueNodeList &value_node_list = prev_canvas->value_node_list();
-			for(ValueNodeList::const_iterator i = value_node_list.begin(); i != value_node_list.end(); i++)
-			{
+			for (ValueNodeList::const_iterator i = value_node_list.begin(); i != value_node_list.end(); ++i) {
 				ValueNode::Handle new_node = (*i)->clone(canvas, guid);
 				assert(new_node);
 				if (new_node)

@@ -30,7 +30,6 @@
 
 /* === H E A D E R S ======================================================= */
 
-#include <ETL/ref_count>
 #include <synfig/string.h>
 #include <synfig/main.h>
 #include <synfig/distance.h>
@@ -60,12 +59,12 @@ namespace synfigapp {
 */
 class Main : public synfig::Main
 {
-	etl::reference_counter ref_count_;
+	synfig::ReferenceCounter ref_count_;
 public:
 	Main(const synfig::String &rootpath,synfig::ProgressCallback *cb=nullptr);
 	~Main();
 
-	const etl::reference_counter& ref_count()const { return ref_count_; }
+	const synfig::ReferenceCounter& ref_count()const { return ref_count_; }
 
 	static const synfig::Color& get_outline_color();
 	static const synfig::Color& get_fill_color();
@@ -106,7 +105,7 @@ public:
 	static sigc::signal<void>& signal_gradient_changed();
 	static sigc::signal<void>& signal_bline_width_changed();
 	
-	static synfig::String get_user_app_directory();
+	static synfig::filesystem::Path get_user_app_directory();
 
 }; // END of class Main
 

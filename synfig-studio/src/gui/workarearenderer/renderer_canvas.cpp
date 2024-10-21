@@ -247,7 +247,7 @@ Renderer_Canvas::on_tile_finished(bool success, const Tile::Handle &tile)
 	// don't create handle if ref-count is zero
 	// it means that object was nether had a handles and will removed with handle
 	// or object is already in destruction phase
-	if (shared_object::count())
+	if (shared_object::use_count())
 		Glib::signal_idle().connect_once(
 			sigc::bind(sigc::ptr_fun(&on_post_tile_finished_callback), etl::handle<Renderer_Canvas>(this), tile),
 			visible_frames.count(tile->frame_id) ? Glib::PRIORITY_DEFAULT : Glib::PRIORITY_DEFAULT_IDLE );
@@ -515,7 +515,7 @@ Renderer_Canvas::enqueue_render_frame(
 		loading_error_msg = _("Unknown reason");
 	}
 	if (!loading_error_msg.empty()) {
-		std::string full_error_msg = etl::strprintf(_("Error loading canvas resources at %s (%s):\n\t%s"), id.time.get_string().c_str(), canvas->get_name().c_str(), loading_error_msg.c_str());
+		std::string full_error_msg = synfig::strprintf(_("Error loading canvas resources at %s (%s):\n\t%s"), id.time.get_string().c_str(), canvas->get_name().c_str(), loading_error_msg.c_str());
 		rendering_error_msg_map[id.time].insert(full_error_msg);
 		synfig::error(full_error_msg);
 		return false;
@@ -589,7 +589,7 @@ Renderer_Canvas::enqueue_render()
 		RectInt        window_rect    = get_work_area()->get_window_rect();
 		bool           bg_rendering   = get_work_area()->get_background_rendering();
 		Canvas::Handle canvas         = get_work_area()->get_canvas();
-		etl::handle<CanvasView> canvas_view = get_work_area()->get_canvas_view();
+		CanvasView::Handle canvas_view = get_work_area()->get_canvas_view();
 		etl::handle<TimeModel> time_model = canvas_view->time_model();
 		bool			is_playing = canvas_view->is_playing();
 		bool			is_bounded = time_model->get_play_bounds_enabled();

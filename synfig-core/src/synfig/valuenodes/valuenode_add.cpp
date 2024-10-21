@@ -39,6 +39,7 @@
 
 #include <synfig/general.h>
 #include <synfig/localization.h>
+#include <synfig/misc.h>
 #include <synfig/valuenode_registry.h>
 #include <synfig/color.h>
 #include <synfig/gradient.h>
@@ -46,23 +47,19 @@
 #include <synfig/angle.h>
 #include <synfig/real.h>
 
-#include <ETL/misc>
-#include <ETL/stringf>
-
 #include <stdexcept>
 
 #endif
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 
 /* === M A C R O S ========================================================= */
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Add, RELEASE_VERSION_0_61_07, "add", "Add")
+REGISTER_VALUENODE(ValueNode_Add, RELEASE_VERSION_0_61_07, "add", N_("Add"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -71,8 +68,7 @@ REGISTER_VALUENODE(ValueNode_Add, RELEASE_VERSION_0_61_07, "add", "Add")
 synfig::ValueNode_Add::ValueNode_Add(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	set_link("scalar",ValueNode_Const::create(Real(1.0)));
 	Type& type(value.get_type());
 
@@ -144,8 +140,8 @@ synfig::ValueNode_Add::~ValueNode_Add()
 synfig::ValueBase
 synfig::ValueNode_Add::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	if(!ref_a || !ref_b)
 		throw std::runtime_error(strprintf("ValueNode_Add: %s",_("One or both of my parameters aren't set!")));
@@ -214,17 +210,17 @@ ValueNode_Add::get_children_vocab_vfunc() const
 {
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"lhs")
+	ret.push_back(ParamDesc("lhs")
 		.set_local_name(_("Link"))
 		.set_description(_("Left Hand Side of the add"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"rhs")
+	ret.push_back(ParamDesc("rhs")
 		.set_local_name(_("Addition"))
 		.set_description(_("Right Hand Side of the add"))
 	);
 
-		ret.push_back(ParamDesc(ValueBase(),"scalar")
+		ret.push_back(ParamDesc("scalar")
 		.set_local_name(_("Scalar"))
 		.set_description(_("Value that multiplies the add"))
 	);

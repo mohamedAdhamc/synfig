@@ -69,7 +69,7 @@ ChildrenTree::ChildrenTree()
 		// Set up the icon cell-renderer
 		Gtk::CellRendererPixbuf* icon_cellrenderer = Gtk::manage( new Gtk::CellRendererPixbuf() );
 		column->pack_start(*icon_cellrenderer,false);
-		column->add_attribute(icon_cellrenderer->property_pixbuf(), model.icon);
+		column->add_attribute(*icon_cellrenderer, "icon_name", model.icon_name);
 
 		// Pack the label into the column
 		column->pack_start(model.label,true);
@@ -134,6 +134,8 @@ ChildrenTree::ChildrenTree()
 	// This makes things easier to read.
 	tree_view.set_rules_hint();
 
+	get_style_context()->add_class("library");
+
 	// Make us more sensitive to several events
 	tree_view.add_events(Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK | Gdk::BUTTON1_MOTION_MASK | Gdk::BUTTON2_MOTION_MASK|Gdk::POINTER_MOTION_MASK);
 
@@ -150,7 +152,7 @@ ChildrenTree::ChildrenTree()
 
 	attach(*scroll_children_tree, 0, 3, 0, 1, Gtk::EXPAND|Gtk::FILL,Gtk::EXPAND|Gtk::FILL, 0, 0);
 
-	hbox=manage(new Gtk::HBox());
+	hbox=manage(new Gtk::Box());
 
 	attach(*hbox, 0, 1, 1, 2, Gtk::FILL|Gtk::SHRINK, Gtk::SHRINK, 0, 0);
 

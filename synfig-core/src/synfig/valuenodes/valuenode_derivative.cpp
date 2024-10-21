@@ -39,8 +39,6 @@
 #include <synfig/valuenode_registry.h>
 #include <synfig/vector.h>
 
-#include <ETL/misc>
-
 #endif
 
 /* === U S I N G =========================================================== */
@@ -141,7 +139,7 @@ using namespace synfig;
 				)
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Derivative, RELEASE_VERSION_1_0, "derivative", "Derivative")
+REGISTER_VALUENODE(ValueNode_Derivative, RELEASE_VERSION_1_0, "derivative", N_("Derivative"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -150,8 +148,7 @@ REGISTER_VALUENODE(ValueNode_Derivative, RELEASE_VERSION_1_0, "derivative", "Der
 ValueNode_Derivative::ValueNode_Derivative(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	set_link("interval",      ValueNode_Const::create(Real(0.01))); // Default interval
 	set_link("accuracy",      ValueNode_Const::create((int)(NORMAL)));
 	set_link("order",         ValueNode_Const::create((int)(FIRST)));
@@ -192,8 +189,8 @@ ValueNode_Derivative::~ValueNode_Derivative()
 ValueBase
 ValueNode_Derivative::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	Type &type(get_type());
 	if (type == type_real)
@@ -360,15 +357,15 @@ ValueNode_Derivative::get_children_vocab_vfunc()const
 		return children_vocab;
 
 	LinkableValueNode::Vocab ret;
-	ret.push_back(ParamDesc(ValueBase(),"link")
+	ret.push_back(ParamDesc("link")
 		.set_local_name(_("Link"))
 		.set_description(_("Value to calculate the derivative"))
 	);
-	ret.push_back(ParamDesc(ValueBase(),"interval")
+	ret.push_back(ParamDesc("interval")
 		.set_local_name(_("Interval"))
 		.set_description(_("Interval of time to calculate the finite differences"))
 	);
-	ret.push_back(ParamDesc(ValueBase(),"accuracy")
+	ret.push_back(ParamDesc("accuracy")
 		.set_local_name(_("Accuracy"))
 		.set_description(_("Accuracy of the derivative"))
 		.set_hint("enum")
@@ -377,7 +374,7 @@ ValueNode_Derivative::get_children_vocab_vfunc()const
 		.add_enum_value(FINE,"fine",_("Fine"))
 		.add_enum_value(EXTREME,"extreme",_("Extreme"))
 	);
-	ret.push_back(ParamDesc(ValueBase(),"order")
+	ret.push_back(ParamDesc("order")
 		.set_local_name(_("Order"))
 		.set_description(_("Order of the derivative"))
 		.set_hint("enum")

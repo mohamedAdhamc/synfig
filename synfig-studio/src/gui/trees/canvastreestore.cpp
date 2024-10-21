@@ -91,6 +91,22 @@ CanvasTreeStore::expandable_bone_parent(ValueNode::Handle node)
 	return node;
 }
 
+// TODO(ice0): duplicate
+template<typename T>
+static void set_gvalue_tpl(Glib::ValueBase& value, const T &v, bool use_assign_operator)
+{
+	Glib::Value<T> x;
+	g_value_init(x.gobj(), x.value_type());
+
+	x.set(v);
+
+	g_value_init(value.gobj(), x.value_type());
+	if (use_assign_operator)
+		value = x;
+	else
+		g_value_copy(x.gobj(), value.gobj());
+}
+
 void
 CanvasTreeStore::get_value_vfunc(const Gtk::TreeModel::iterator& iter, int column, Glib::ValueBase& value)const
 {
@@ -226,6 +242,8 @@ CanvasTreeStore::get_value_vfunc(const Gtk::TreeModel::iterator& iter, int colum
 	if(column==model.is_editable.index())
 	{
 		synfigapp::ValueDesc value_desc((*iter)[model.value_desc]);
+		if (!value_desc)
+			return Gtk::TreeStore::get_value_vfunc(iter,column,value);
 
 		Glib::Value<bool> x;
 		g_value_init(x.gobj(),x.value_type());
@@ -325,35 +343,22 @@ CanvasTreeStore::get_value_vfunc(const Gtk::TreeModel::iterator& iter, int colum
 		g_value_copy(x.gobj(),value.gobj());
 	}
 	else
-	if(column==model.icon.index())
+	if(column==model.icon_name.index())
 	{
 		synfigapp::ValueDesc value_desc((*iter)[model.value_desc]);
 		if(!value_desc)
 			return Gtk::TreeStore::get_value_vfunc(iter,column,value);
 
-		Glib::Value<Glib::RefPtr<Gdk::Pixbuf> > x;
-		g_value_init(x.gobj(),x.value_type());
-
-		x.set(get_tree_pixbuf(value_desc.get_value_type()));
-
-		g_value_init(value.gobj(),x.value_type());
-		g_value_copy(x.gobj(),value.gobj());
+		set_gvalue_tpl<Glib::ustring>(value, value_icon_name(value_desc.get_value_type()), true);
 	}
 	else
-	if(column==model.interpolation_icon.index())
+	if(column==model.interpolation_icon_name.index())
 	{
 		synfigapp::ValueDesc value_desc((*iter)[model.value_desc]);
 		if(!value_desc)
 			return Gtk::TreeStore::get_value_vfunc(iter,column,value);
-		
-		Glib::Value<Glib::RefPtr<Gdk::Pixbuf> > x;
-		g_value_init(x.gobj(),x.value_type());
-		
-		x.set(get_interpolation_pixbuf(value_desc.get_interpolation()));
-		
-		g_value_init(value.gobj(),x.value_type());
-		g_value_copy(x.gobj(),value.gobj());
-		
+
+		set_gvalue_tpl<Glib::ustring>(value, interpolation_icon_name(value_desc.get_interpolation()), true);
 	}
 	else
 	if(column==model.is_static.index())
@@ -542,10 +547,9 @@ CanvasTreeStore::set_row(Gtk::TreeRow row,synfigapp::ValueDesc value_desc, bool 
 			if(linkable && do_children)
 			{
 				row[model.link_count] = linkable->link_count();
-				LinkableValueNode::Vocab vocab(linkable->get_children_vocab());
-				LinkableValueNode::Vocab::iterator iter(vocab.begin());
-				for(int i=0;i<linkable->link_count();i++, iter++)
-				{
+				const LinkableValueNode::Vocab& vocab(linkable->get_children_vocab());
+				LinkableValueNode::Vocab::const_iterator iter(vocab.begin());
+				for (int i = 0; i < linkable->link_count(); ++i, ++iter) {
 					if(iter->get_hidden())
 						continue;
 					Gtk::TreeRow child_row=*(append(row.children()));

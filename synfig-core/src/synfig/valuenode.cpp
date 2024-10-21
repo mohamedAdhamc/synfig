@@ -47,7 +47,6 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 
 /* === M A C R O S ========================================================= */
@@ -126,7 +125,7 @@ LinkableValueNode::unlink_all()
 	{
 		ValueNode::LooseHandle value_node(get_link(i));
 		if(value_node)
-			value_node->parent_set.erase(this);
+			remove_child(value_node.get());
 	}
 }
 
@@ -140,10 +139,10 @@ ValueNode::~ValueNode()
 void
 ValueNode::on_changed()
 {
-	if (getenv("SYNFIG_DEBUG_ON_CHANGED"))
-		printf("%s:%d ValueNode::on_changed()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_ON_CHANGED",
+		"%s:%d ValueNode::on_changed()\n", __FILE__, __LINE__);
 
-	etl::loose_handle<Canvas> parent_canvas = get_parent_canvas();
+	Canvas::LooseHandle parent_canvas = get_parent_canvas();
 	if(parent_canvas)
 		do						// signal to all the ancestor canvases
 			parent_canvas->signal_value_node_changed()(this);
@@ -155,15 +154,15 @@ ValueNode::on_changed()
 }
 
 int
-ValueNode::replace(etl::handle<ValueNode> x)
+ValueNode::replace(ValueNode::Handle x)
 {
 	if(x.get()==this)
 		return 0;
 
-	while(parent_set.size())
+	while(parent_count())
 	{
-		(*parent_set.begin())->add_child(x.get());
-		(*parent_set.begin())->remove_child(this);
+		get_first_parent()->add_child(x.get());
+		get_first_parent()->remove_child(this);
 		//x->parent_set.insert(*parent_set.begin());
 		//parent_set.erase(parent_set.begin());
 	}
@@ -185,9 +184,6 @@ ValueNode::set_id(const String &x)
 String
 ValueNode::get_description(bool show_exported_name)const
 {
-	if (const LinkableValueNode* value_node = dynamic_cast<const LinkableValueNode*>(this))
-		return value_node->get_description(-1, show_exported_name);
-
 	String ret(_("ValueNode"));
 
 	if (show_exported_name && !is_exported())
@@ -200,24 +196,21 @@ ValueNode::get_description(bool show_exported_name)const
 }
 
 bool
-ValueNode::is_descendant(ValueNode::Handle value_node_dest)
+ValueNode::is_ancestor_of(ValueNode::Handle value_node_dest) const
 {
-    if(!value_node_dest)
-        return false;
-    if(Handle(this) == value_node_dest)
-        return true;
+	if (this == value_node_dest)
+		return true;
+	if (!value_node_dest)
+		return false;
+	if (!value_node_dest->parent_count())
+		return false;
 
-    //! loop through the parents of each node in current_nodes
-	std::set<Node*> node_parents(value_node_dest->parent_set);
-    ValueNode::Handle value_node_parent;
-    for (std::set<Node*>::iterator iter = node_parents.begin(); iter != node_parents.end(); iter++)
-    {
-        value_node_parent = ValueNode::Handle::cast_dynamic(*iter);
-        if(Handle(this) == value_node_parent)
-            break;
-    }
+	ValueNode::Handle value_node_parent;
+	value_node_parent = value_node_dest->find_first_parent_of_type<ValueNode>([=](ValueNode::Handle node) {
+		return is_ancestor_of(node);
+	});
 
-    return value_node_dest->parent_count() ? is_descendant(value_node_parent) : false;
+	return value_node_parent? true : false;
 }
 
 void
@@ -286,19 +279,20 @@ ValueNode::canvas_time_bounds(const Canvas &canvas, bool &found, Time &begin, Ti
 void
 ValueNode::find_time_bounds(const Node &node, bool &found, Time &begin, Time &end, Real &fps)
 {
-	for(std::set<Node*>::const_iterator i = node.parent_set.begin(); i != node.parent_set.end(); ++i)
+	auto find_func = [&found, &begin, &end, &fps] (const Node* node) -> bool
 	{
-		if (!*i) continue;
-		if (Layer *layer = dynamic_cast<Layer*>(*i))
+		if (const Layer *layer = dynamic_cast<const Layer*>(node))
 		{
 			if (Canvas::Handle canvas = layer->get_canvas())
 				canvas_time_bounds(*canvas->get_root(), found, begin, end, fps);
 		}
 		else
 		{
-			find_time_bounds(**i, found, begin, end, fps);
+			find_time_bounds(*node, found, begin, end, fps);
 		}
-	}
+		return false;
+	};
+	node.foreach_parent(find_func);
 }
 
 void
@@ -494,7 +488,7 @@ ValueNodeList::audit()
 	iterator iter,next;
 
 	for(next=begin(),iter=next++;iter!=end();iter=next++)
-		if(iter->count()==1)
+		if (iter->use_count() == 1)
 			std::list<ValueNode::RHandle>::erase(iter);
 }
 
@@ -529,8 +523,8 @@ PlaceholderValueNode::clone(Canvas::LooseHandle canvas, const GUID& deriv_guid)c
 PlaceholderValueNode::Handle
 PlaceholderValueNode::create(Type &type)
 {
-	if (getenv("SYNFIG_DEBUG_PLACEHOLDER_VALUENODE"))
-		printf("%s:%d PlaceholderValueNode::create\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_PLACEHOLDER_VALUENODE",
+		"%s:%d PlaceholderValueNode::create\n", __FILE__, __LINE__);
 	return new PlaceholderValueNode(type);
 }
 
@@ -589,35 +583,35 @@ ValueNode::get_relative_id(etl::loose_handle<const Canvas> x)const
 	return canvas_->_get_relative_id(x)+':'+get_id();
 }
 
-etl::loose_handle<Canvas>
+Canvas::LooseHandle
 ValueNode::get_parent_canvas()const
 {
-	if (getenv("SYNFIG_DEBUG_GET_PARENT_CANVAS"))
-		printf("%s:%d get_parent_canvas of %p is %p\n", __FILE__, __LINE__, this, canvas_.get());
+	DEBUG_LOG("SYNFIG_DEBUG_GET_PARENT_CANVAS",
+		"%s:%d get_parent_canvas of %p is %p\n", __FILE__, __LINE__, this, canvas_.get());
 
 	return canvas_;
 }
 
-etl::loose_handle<Canvas>
+Canvas::LooseHandle
 ValueNode::get_root_canvas()const
 {
-	if (getenv("SYNFIG_DEBUG_GET_PARENT_CANVAS"))
-		printf("%s:%d get_root_canvas of %p is %p\n", __FILE__, __LINE__, this, root_canvas_.get());
+	DEBUG_LOG("SYNFIG_DEBUG_GET_PARENT_CANVAS",
+		"%s:%d get_root_canvas of %p is %p\n", __FILE__, __LINE__, this, root_canvas_.get());
 
 	return root_canvas_;
 }
 
-etl::loose_handle<Canvas>
+Canvas::LooseHandle
 ValueNode::get_non_inline_ancestor_canvas()const
 {
-	etl::loose_handle<Canvas> parent(get_parent_canvas());
+	Canvas::LooseHandle parent(get_parent_canvas());
 
 	if (parent)
 	{
-		etl::loose_handle<Canvas> ret(parent->get_non_inline_ancestor());
+		Canvas::LooseHandle ret(parent->get_non_inline_ancestor());
 
-		if (getenv("SYNFIG_DEBUG_GET_PARENT_CANVAS"))
-			printf("%s:%d get_non_inline_ancestor_canvas of %p is %p\n", __FILE__, __LINE__, this, ret.get());
+		DEBUG_LOG("SYNFIG_DEBUG_GET_PARENT_CANVAS",
+			"%s:%d get_non_inline_ancestor_canvas of %p is %p\n", __FILE__, __LINE__, this, ret.get());
 
 		return ret;
 	}
@@ -626,29 +620,29 @@ ValueNode::get_non_inline_ancestor_canvas()const
 }
 
 void
-ValueNode::set_parent_canvas(etl::loose_handle<Canvas> x)
+ValueNode::set_parent_canvas(Canvas::LooseHandle x)
 {
-	if (getenv("SYNFIG_DEBUG_SET_PARENT_CANVAS"))
-		printf("%s:%d set_parent_canvas of %p to %p\n", __FILE__, __LINE__, this, x.get());
+	DEBUG_LOG("SYNFIG_DEBUG_SET_PARENT_CANVAS",
+		"%s:%d set_parent_canvas of %p to %p\n", __FILE__, __LINE__, this, x.get());
 
 	canvas_=x;
 
-	if (getenv("SYNFIG_DEBUG_SET_PARENT_CANVAS"))
-		printf("%s:%d now %p\n", __FILE__, __LINE__, canvas_.get());
+	DEBUG_LOG("SYNFIG_DEBUG_SET_PARENT_CANVAS",
+		"%s:%d now %p\n", __FILE__, __LINE__, canvas_.get());
 
 	if(x) set_root_canvas(x);
 }
 
 void
-ValueNode::set_root_canvas(etl::loose_handle<Canvas> x)
+ValueNode::set_root_canvas(Canvas::LooseHandle x)
 {
-	if (getenv("SYNFIG_DEBUG_SET_PARENT_CANVAS"))
-		printf("%s:%d set_root_canvas of %p to %p - ", __FILE__, __LINE__, this, x.get());
+	DEBUG_LOG("SYNFIG_DEBUG_SET_PARENT_CANVAS",
+		"%s:%d set_root_canvas of %p to %p - ", __FILE__, __LINE__, this, x.get());
 
 	root_canvas_=x->get_root();
 
-	if (getenv("SYNFIG_DEBUG_SET_PARENT_CANVAS"))
-		printf("now %p\n", root_canvas_.get());
+	DEBUG_LOG("SYNFIG_DEBUG_SET_PARENT_CANVAS",
+		"now %p\n", root_canvas_.get());
 }
 
 String
@@ -677,7 +671,7 @@ void LinkableValueNode::get_times_vfunc(Node::time_set &set) const
 }
 
 String
-LinkableValueNode::get_description(int index, bool show_exported_name)const
+LinkableValueNode::get_link_description(int index, bool show_exported_name)const
 {
 	String description;
 
@@ -703,7 +697,7 @@ LinkableValueNode::get_description(int index, bool show_exported_name)const
 	LinkableValueNode::ConstHandle parent_linkable_vn;
 
 	// walk up through the valuenodes trying to find the layer at the top
-	while (!node->parent_set.empty() && !dynamic_cast<const Layer*>(node))
+	while (node->parent_count() && !dynamic_cast<const Layer*>(node))
 	{
 		LinkableValueNode::ConstHandle linkable_value_node(dynamic_cast<const LinkableValueNode*>(node));
 		if (linkable_value_node)
@@ -719,7 +713,7 @@ LinkableValueNode::get_description(int index, bool show_exported_name)const
 
 			description = linkable_value_node->get_local_name() + link + (parent_linkable_vn?">":"") + description;
 		}
-		node = *node->parent_set.begin();
+		node = node->get_first_parent();
 		parent_linkable_vn = linkable_value_node;
 	}
 
@@ -729,7 +723,7 @@ LinkableValueNode::get_description(int index, bool show_exported_name)const
 		String param;
 		const Layer::DynamicParamList &dynamic_param_list(parent_layer->dynamic_param_list());
 		// loop to find the parameter in the dynamic parameter list - this gives us its name
-		for (Layer::DynamicParamList::const_iterator iter = dynamic_param_list.begin(); iter != dynamic_param_list.end(); iter++)
+		for (Layer::DynamicParamList::const_iterator iter = dynamic_param_list.begin(); iter != dynamic_param_list.end(); ++iter)
 			if (iter->second == parent_linkable_vn)
 				param = String(":") + parent_layer->get_param_local_name(iter->first);
 		description = strprintf("(%s)%s>%s",
@@ -744,36 +738,38 @@ LinkableValueNode::get_description(int index, bool show_exported_name)const
 String
 LinkableValueNode::get_description(bool show_exported_name)const
 {
-	return get_description(-1, show_exported_name);
+	return get_link_description(-1, show_exported_name);
 }
 
 String
 LinkableValueNode::link_name(int i)const
 {
-	Vocab vocab(get_children_vocab());
-	Vocab::iterator iter(vocab.begin());
+	const auto& vocab = children_vocab;
+	Vocab::const_iterator iter(vocab.begin());
 	int j=0;
-	for(;iter!=vocab.end() && j<i; iter++, j++) {}
+	for( ; iter != vocab.end() && j < i; ++iter, ++j)
+	{}
 	return iter!=vocab.end()?iter->get_name():String();
 }
 
 String
 LinkableValueNode::link_local_name(int i)const
 {
-	Vocab vocab(get_children_vocab());
-	Vocab::iterator iter(vocab.begin());
+	const auto& vocab = children_vocab;
+	Vocab::const_iterator iter(vocab.begin());
 	int j=0;
-	for(;iter!=vocab.end() && j<i; iter++, j++) {}
+	for( ; iter != vocab.end() && j < i; ++iter, ++j)
+	{}
 	return iter!=vocab.end()?iter->get_local_name():String();
 }
 
 int
 LinkableValueNode::get_link_index_from_name(const String &name)const
 {
-	Vocab vocab(get_children_vocab());
-	Vocab::iterator iter(vocab.begin());
+	const auto& vocab = children_vocab;
+	Vocab::const_iterator iter(vocab.begin());
 	int j=0;
-	for(; iter!=vocab.end(); iter++, j++)
+	for( ; iter != vocab.end(); ++iter, ++j)
 		if(iter->get_name()==name) return j;
 	throw Exception::BadLinkName(name);
 }
@@ -781,13 +777,13 @@ LinkableValueNode::get_link_index_from_name(const String &name)const
 int
 LinkableValueNode::link_count()const
 {
-	return get_children_vocab().size();
+	return children_vocab.size();
 }
 
-LinkableValueNode::Vocab
+const LinkableValueNode::Vocab&
 LinkableValueNode::get_children_vocab()const
 {
-	return get_children_vocab_vfunc();
+	return children_vocab;
 }
 
 void
@@ -797,7 +793,13 @@ LinkableValueNode::set_children_vocab(const Vocab &newvocab)
 }
 
 void
-LinkableValueNode::set_root_canvas(etl::loose_handle<Canvas> x)
+LinkableValueNode::init_children_vocab()
+{
+	set_children_vocab(get_children_vocab_vfunc());
+}
+
+void
+LinkableValueNode::set_root_canvas(Canvas::LooseHandle x)
 {
 	ValueNode::set_root_canvas(x);
 	for(int i = 0; i < link_count(); ++i)

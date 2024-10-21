@@ -55,7 +55,6 @@
 /* === U S I N G =========================================================== */
 
 using namespace synfig;
-using namespace etl;
 
 /* === G L O B A L S ======================================================= */
 
@@ -115,7 +114,7 @@ Layer_Duplicate::get_param(const String &param)const
 Color
 Layer_Duplicate::get_color(Context context, const Point &pos)const
 {
-	handle<ValueNode_Duplicate> duplicate_param = get_duplicate_param();
+	ValueNode_Duplicate::Handle duplicate_param = get_duplicate_param();
 	if (!duplicate_param) return context.get_color(pos);
 
 	Color::BlendMethod blend_method(get_blend_method());
@@ -154,15 +153,15 @@ Layer_Duplicate::get_duplicate_param()const
 {
 	const DynamicParamList &dpl = dynamic_param_list();
 	DynamicParamList::const_iterator iter = dpl.find("index");
-	if (iter == dpl.end()) return NULL;
-	etl::rhandle<ValueNode> param(iter->second);
+	if (iter == dpl.end()) return nullptr;
+	ValueNode::RHandle param(iter->second);
 	return ValueNode_Duplicate::Handle::cast_dynamic(param);
 }
 
 rendering::Task::Handle
 Layer_Duplicate::build_rendering_task_vfunc(Context context) const
 {
-	handle<ValueNode_Duplicate> duplicate_param = get_duplicate_param();
+	ValueNode_Duplicate::Handle duplicate_param = get_duplicate_param();
 	if (!duplicate_param)
 		return context.build_rendering_task();
 

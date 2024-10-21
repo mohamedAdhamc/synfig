@@ -87,7 +87,7 @@ public:
 
 	public:
 		Token(const DescBase &desc):
-			synfig::Token(token.handle()),
+			synfig::Token(Surface::token.handle()),
 			DescBase(desc) { }
 
 		inline Handle handle() const
@@ -126,7 +126,7 @@ protected:
 		{ return false; }
 	//! Implementations of this function should to work quick
 	virtual const Color* get_pixels_pointer_vfunc() const
-		{ return NULL; }
+		{ return nullptr; }
 	virtual bool get_pixels_vfunc(Color *dest) const;
 
 public:
@@ -219,7 +219,8 @@ public:
 		bool convert(const Surface::Token::Handle &token, bool create = true, bool any = false) {
 			if (!resource) return false;
 			if (lock_token && token != this->token) return false;
-			return surface = resource->get_surface(token, exclusive, full, rect, create, any);
+			surface = resource->get_surface(token, exclusive, full, rect, create, any);
+			return static_cast<bool>(surface);
 		}
 
 		template<typename T>
@@ -241,8 +242,8 @@ public:
 			{ return etl::handle<T>::cast_dynamic(surface); }
 		TypeSurface* get_surface() const
 			{ return surface.get(); }
-		operator bool() const
-			{ return surface; }
+		explicit operator bool() const noexcept
+			{ return static_cast<bool>(surface); }
 	};
 
 	typedef LockBase<const Surface, false, false> LockReadBase;

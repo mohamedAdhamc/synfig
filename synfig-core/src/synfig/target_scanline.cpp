@@ -41,7 +41,6 @@
 
 #include "canvas.h"
 #include "context.h"
-#include "render.h"
 #include "string.h"
 #include "surface.h"
 #include "rendering/renderer.h"
@@ -58,9 +57,7 @@ using namespace rendering;
 
 /* === M A C R O S ========================================================= */
 
-#define PIXEL_RENDERING_LIMIT 1500000
-
-#define USE_PIXELRENDERING_LIMIT 1
+#define DEFAULT_PIXEL_RENDERING_LIMIT 9000000 // 1500000 - original limit, 2100000 - full HD 1920x1080, 8300000 - 4k UHD, 33200000 - 8k UHD
 
 /* === G L O B A L S ======================================================= */
 
@@ -68,8 +65,9 @@ using namespace rendering;
 
 /* === M E T H O D S ======================================================= */
 
-Target_Scanline::Target_Scanline():
-	threads_(2)
+Target_Scanline::Target_Scanline()
+	: threads_(2),
+	  pixel_rendering_limit_(DEFAULT_PIXEL_RENDERING_LIMIT)
 {
 	curr_frame_=0;
 	if (const char *s = getenv("SYNFIG_TARGET_DEFAULT_ENGINE"))
@@ -96,7 +94,7 @@ synfig::Target_Scanline::call_renderer(
 	{
 		rendering::Renderer::Handle renderer = rendering::Renderer::get_renderer(get_engine());
 		if (!renderer)
-			throw "Renderer '" + get_engine() + "' not found";
+			throw strprintf(_("Renderer '%s' not found"), get_engine().c_str());
 
 		Vector p0 = renddesc.get_tl();
 		Vector p1 = renddesc.get_br();
@@ -124,15 +122,6 @@ synfig::Target_Scanline::call_renderer(
 bool
 synfig::Target_Scanline::render(ProgressCallback *cb)
 {
-	SuperCallback super_cb;
-	int
-		frames=0,
-		total_frames,
-		frame_start,
-		frame_end;
-	Time
-		t=0;
-
 	assert(canvas);
 	curr_frame_=0;
 
@@ -141,21 +130,25 @@ synfig::Target_Scanline::render(ProgressCallback *cb)
 		return false;
 	}
 
-	frame_start=desc.get_frame_start();
-	frame_end=desc.get_frame_end();
+	const int frame_start = desc.get_frame_start();
+	const int frame_end = desc.get_frame_end();
 
 	ContextParams context_params(desc.get_render_excluded_contexts());
 
 	// Calculate the number of frames
-	total_frames=frame_end-frame_start+1;
-	if(total_frames<=0)total_frames=1;
+	const int total_frames = frame_end >= frame_start ? (frame_end - frame_start + 1) : 1;
+
+	// Stuff related to render split if image is too large
+	const int total_pixels = desc.get_w() * desc.get_h();
+	const bool is_rendering_split = pixel_rendering_limit_ > 0 && total_pixels > pixel_rendering_limit_;
+
+	const int rowheight = std::max(1, pixel_rendering_limit_ / desc.get_w());
+	const int rows = 1 + desc.get_h() / rowheight;
+	const int lastrowheight = desc.get_h() - (rows - 1) * rowheight;
 
 	try {
-
-	//synfig::info("1time_set_to %s",t.get_string().c_str());
-
-	if(total_frames>=1)
-	{
+		Time t = 0;
+		int frames = 0;
 		do{
 			// Grab the time
 			frames=next_frame(t);
@@ -172,22 +165,12 @@ synfig::Target_Scanline::render(ProgressCallback *cb)
 			}
 			canvas->set_outline_grow(desc.get_outline_grow());
 
-			// If quality is set otherwise, then we use the accelerated renderer
 			{
-				#if USE_PIXELRENDERING_LIMIT
-				if(desc.get_w()*desc.get_h() > PIXEL_RENDERING_LIMIT)
-				{
+				if (is_rendering_split) {
 					SurfaceResource::Handle surface = new SurfaceResource();
 
-					int rowheight = PIXEL_RENDERING_LIMIT/desc.get_w();
-					if (!rowheight) rowheight = 1; // TODO: render partial lines to stay within the limit?
-					int rows = desc.get_h()/rowheight;
-					int lastrowheight = desc.get_h() - rows*rowheight;
-
-					rows++;
-
-					synfig::info("Render split to %d block%s %d pixels tall, and a final block %d pixels tall",
-								 rows-1, rows==2?"":"s", rowheight, lastrowheight);
+					synfig::info(_("Render split to %d blocks %d pixels tall, and a final block %d pixels tall"),
+								 rows-1, rowheight, lastrowheight);
 
 					// loop through all the full rows
 					if(!start_frame())
@@ -200,6 +183,7 @@ synfig::Target_Scanline::render(ProgressCallback *cb)
 
 					for(int i=0; i < rows; ++i)
 					{
+						const int y_offset = i * rowheight;
 						surface->reset();
 						RendDesc blockrd = desc;
 
@@ -207,11 +191,11 @@ synfig::Target_Scanline::render(ProgressCallback *cb)
 						if(i == rows-1)
 						{
 							if(!lastrowheight) break;
-							blockrd.set_subwindow(0,i*rowheight,desc.get_w(),lastrowheight);
+							blockrd.set_subwindow(0, y_offset, desc.get_w(), lastrowheight);
 						}
 						else
 						{
-							blockrd.set_subwindow(0,i*rowheight,desc.get_w(),rowheight);
+							blockrd.set_subwindow(0, y_offset, desc.get_w(), rowheight);
 						}
 
 						//synfig::info( " -- block %d/%d left, top, width, height: %d, %d, %d, %d",
@@ -230,53 +214,7 @@ synfig::Target_Scanline::render(ProgressCallback *cb)
 
 							const synfig::Surface &s = lock->get_surface();
 
-							int y;
-							int rowspan=sizeof(Color)*s.get_w();
-							Surface::const_pen pen = s.begin();
-
-							int yoff = i*rowheight;
-
-							for(y = 0; y < blockrd.get_h(); y++, pen.inc_y())
-							{
-								Color *colordata= start_scanline(y + yoff);
-								if(!colordata)
-								{
-//									throw(string("add_frame(): call to start_scanline(y) returned NULL"));
-									if(cb)
-										cb->error(_("add_frame(): call to start_scanline(y) returned NULL"));
-									return false;
-								}
-
-								switch(get_alpha_mode())
-								{
-									case TARGET_ALPHA_MODE_FILL:
-										for(int i = 0; i < s.get_w(); i++)
-											colordata[i] = Color::blend(s[y][i], desc.get_bg_color(), 1.0f);
-										break;
-									case TARGET_ALPHA_MODE_EXTRACT:
-										for(int i = 0; i < s.get_w(); i++)
-										{
-											float a=s[y][i].get_a();
-											colordata[i] = Color(a,a,a,a);
-										}
-										break;
-									case TARGET_ALPHA_MODE_REDUCE:
-										for(int i = 0; i < s.get_w(); i++)
-											colordata[i] = Color(s[y][i].get_r(), s[y][i].get_g(), s[y][i].get_b(), 1.f);
-										break;
-									case TARGET_ALPHA_MODE_KEEP:
-										memcpy(colordata, s[y], rowspan);
-										break;
-								}
-
-								if(!end_scanline())
-								{
-//									throw(string("render(): target panic on end_scanline()"));
-									if(cb)
-										cb->error(_("render(): target panic on end_scanline()"));
-									return false;
-								}
-							}
+							if(!process_block_alpha(s, s.get_w(), blockrd.get_h(), y_offset, cb)) return false;
 						}
 					}
 					surface->reset();
@@ -285,7 +223,6 @@ synfig::Target_Scanline::render(ProgressCallback *cb)
 
 				}else //use normal rendering...
 				{
-				#endif
 					SurfaceResource::Handle surface = new SurfaceResource();
 
 					if (!call_renderer(surface, *canvas, context_params, desc))
@@ -309,170 +246,9 @@ synfig::Target_Scanline::render(ProgressCallback *cb)
 						if(cb)cb->error(_("Unable to put surface on target"));
 						return false;
 					}
-				#if USE_PIXELRENDERING_LIMIT
 				}
-				#endif
 			}
-		}while(frames);
-	}
-    else
-    {
-		// Set the time that we wish to render
-		if(!get_avoid_time_sync() || canvas->get_time()!=t) {
-			canvas->set_time(t);
-			canvas->load_resources(t);
-		}
-		canvas->set_outline_grow(desc.get_outline_grow());
-
-		// If quality is set otherwise, then we use the accelerated renderer
-		{
-			#if USE_PIXELRENDERING_LIMIT
-			if(desc.get_w()*desc.get_h() > PIXEL_RENDERING_LIMIT)
-			{
-				SurfaceResource::Handle surface(new SurfaceResource());
-
-				int totalheight = desc.get_h();
-				int rowheight = PIXEL_RENDERING_LIMIT/desc.get_w();
-				if (!rowheight) rowheight = 1; // TODO: render partial lines to stay within the limit?
-				int rows = desc.get_h()/rowheight;
-				int lastrowheight = desc.get_h() - rows*rowheight;
-
-				rows++;
-
-				synfig::info("Render split to %d block%s %d pixels tall, and a final block %d pixels tall",
-							 rows-1, rows==2?"":"s", rowheight, lastrowheight);
-
-				// loop through all the full rows
-				if(!start_frame())
-				{
-//					throw(string("render(): target panic on start_frame()"));
-					if(cb)
-						cb->error(_("render(): target panic on start_frame()"));
-					return false;
-				}
-
-				for(int i=0; i < rows; ++i)
-				{
-					surface->reset();
-					RendDesc blockrd = desc;
-
-					//render the strip at the normal size unless it's the last one...
-					if(i == rows-1)
-					{
-						if(!lastrowheight) break;
-						blockrd.set_subwindow(0,i*rowheight,desc.get_w(),lastrowheight);
-					}
-					else
-					{
-						blockrd.set_subwindow(0,i*rowheight,desc.get_w(),rowheight);
-					}
-
-					//synfig::info( " -- block %d/%d left, top, width, height: %d, %d, %d, %d",
-					//	i+1, rows, 0, i*rowheight, blockrd.get_w(), blockrd.get_h() );
-
-					if (!call_renderer(surface, *canvas, context_params, blockrd))
-					{
-						if(cb)cb->error(_("Accelerated Renderer Failure"));
-						return false;
-					}
-
-					SurfaceResource::LockRead<SurfaceSW> lock(surface);
-
-					if(!lock)
-					{
-						if(cb)cb->error(_("Bad surface"));
-						return false;
-					}
-
-					const synfig::Surface &s = lock->get_surface();
-
-					int y;
-					int rowspan=sizeof(Color)*s.get_w();
-					Surface::const_pen pen = s.begin();
-
-					int yoff = i*rowheight;
-
-					for(y = 0; y < blockrd.get_h(); y++, pen.inc_y())
-					{
-						Color *colordata= start_scanline(y + yoff);
-						if(!colordata)
-						{
-//							throw(string("add_frame(): call to start_scanline(y) returned NULL"));
-							if(cb)
-								cb->error(_("add_frame(): call to start_scanline(y) returned NULL"));
-							return false;
-						}
-
-						switch(get_alpha_mode())
-						{
-							case TARGET_ALPHA_MODE_FILL:
-								for(int i = 0; i < s.get_w(); i++)
-									colordata[i] = Color::blend(s[y][i], desc.get_bg_color(), 1.0f);
-								break;
-							case TARGET_ALPHA_MODE_EXTRACT:
-								for(int i = 0; i < s.get_w(); i++)
-								{
-									float a=s[y][i].get_a();
-									colordata[i] = Color(a,a,a,a);
-								}
-								break;
-							case TARGET_ALPHA_MODE_REDUCE:
-								for(int i = 0; i < s.get_w(); i++)
-									colordata[i] = Color(s[y][i].get_r(), s[y][i].get_g(), s[y][i].get_b(), 1.0f);
-								break;
-							case TARGET_ALPHA_MODE_KEEP:
-								memcpy(colordata,s[y], rowspan);
-								break;
-						}
-
-						if(!end_scanline())
-						{
-//							throw(string("render(): target panic on end_scanline()"));
-							if(cb)
-								cb->error(_("render(): target panic on end_scanline()"));
-							return false;
-						}
-					}
-
-					//I'm done with this part
-					if (cb) cb->amount_complete((i+1)*rowheight, totalheight);
-				}
-				surface->reset();
-
-				end_frame();
-
-			}else
-			{
-			#endif
-				SurfaceResource::Handle surface = new SurfaceResource();
-
-				if (!call_renderer(surface, *canvas, context_params, desc))
-				{
-					if(cb)cb->error(_("Accelerated Renderer Failure"));
-					return false;
-				}
-
-				SurfaceResource::LockRead<SurfaceSW> lock(surface);
-
-				if(!lock)
-				{
-					if(cb)cb->error(_("Bad surface"));
-					return false;
-				}
-
-				// Put the surface we renderer
-				// onto the target.
-				if(!add_frame(&lock->get_surface(), cb))
-				{
-					if(cb)cb->error(_("Unable to put surface on target"));
-					return false;
-				}
-			#if USE_PIXELRENDERING_LIMIT
-			}
-			#endif
-		}
-	}
-
+		} while(frames);
 	}
 	catch(const String& str)
 	{
@@ -497,11 +273,6 @@ Target_Scanline::add_frame(const synfig::Surface *surface, ProgressCallback *cb)
 {
 	assert(surface);
 
-
-	int y;
-	int rowspan=sizeof(Color)*surface->get_w();
-	Surface::const_pen pen=surface->begin();
-
 	if(!start_frame(cb))
 	{
 //		throw(string("add_frame(): target panic on start_frame()"));
@@ -510,49 +281,60 @@ Target_Scanline::add_frame(const synfig::Surface *surface, ProgressCallback *cb)
 		return false;
 	}
 
-	for(y=0;y<surface->get_h();y++,pen.inc_y())
+	if(!process_block_alpha(*surface, surface->get_w(), surface->get_h(), 0, cb)) return false;
+	end_frame();
+	return true;
+}
+
+bool
+Target_Scanline::process_block_alpha(const synfig::Surface& surface, int width, int height, int yOffset, ProgressCallback* cb)
+{
+	int rowspan = sizeof(Color) * width;
+	Surface::const_pen pen = surface.begin();
+
+	for(int y = 0; y < height; y++, pen.inc_y())
 	{
-		Color *colordata= start_scanline(y);
+		Color *colordata = start_scanline(y + yOffset);
 		if(!colordata)
 		{
-//			throw(string("add_frame(): call to start_scanline(y) returned NULL"));
-			if (cb)
-				cb->error(_("add_frame(): call to start_scanline(y) returned NULL"));
+			if(cb)
+				cb->error(_("process_block_alpha(): call to start_scanline(y) returned nullptr"));
 			return false;
 		}
 
 		switch(get_alpha_mode())
 		{
 			case TARGET_ALPHA_MODE_FILL:
-				for(int i=0;i<surface->get_w();i++)
-					colordata[i]=Color::blend((*surface)[y][i],desc.get_bg_color(),1.0f);
+				for(int i = 0; i < width; i++)
+				{
+					colordata[i] = Color::blend(surface[y][i], desc.get_bg_color(), 1.0f);
+				}
 				break;
 			case TARGET_ALPHA_MODE_EXTRACT:
-				for(int i=0;i<surface->get_w();i++)
+				for(int i = 0; i < width; i++)
 				{
-					float a=(*surface)[y][i].get_a();
-					colordata[i] = Color(a,a,a,a);
+					float a = surface[y][i].get_a();
+					colordata[i] = Color(a, a, a, a);
 				}
 				break;
 			case TARGET_ALPHA_MODE_REDUCE:
-				for(int i = 0; i < surface->get_w(); i++)
-					colordata[i] = Color((*surface)[y][i].get_r(),(*surface)[y][i].get_g(),(*surface)[y][i].get_b(),1.0f);
+				for(int i = 0; i < width; i++)
+				{
+					colordata[i] = surface[y][i];
+					colordata[i].set_a(1.f);
+				}
 				break;
 			case TARGET_ALPHA_MODE_KEEP:
-				memcpy(colordata,(*surface)[y],rowspan);
+				memcpy(colordata, surface[y], rowspan);
 				break;
 		}
 
 		if(!end_scanline())
 		{
-//			throw(string("add_frame(): target panic on end_scanline()"));
-			if (cb)
-				cb->error(_("add_frame(): target panic on end_scanline()"));
+			if(cb)
+				cb->error(_("process_block_alpha(): target panic on end_scanline()"));
 			return false;
 		}
 	}
-
-	end_frame();
-
 	return true;
 }

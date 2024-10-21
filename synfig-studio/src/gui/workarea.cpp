@@ -39,7 +39,6 @@
 
 #include <gui/workarea.h>
 
-#include <gtkmm/arrow.h>
 #include <gtkmm/scrollbar.h>
 
 #include <gui/app.h>
@@ -70,18 +69,12 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 using namespace studio;
 
 /* === M A C R O S ========================================================= */
 
 #define THUMB_SIZE 128
-
-#ifndef stratof
-#define stratof(X) (atof((X).c_str()))
-#define stratoi(X) (atoi((X).c_str()))
-#endif
 
 /* === G L O B A L S ======================================================= */
 
@@ -119,6 +112,7 @@ WorkArea::DirtyTrap::~DirtyTrap()
 WorkArea::WorkArea(etl::loose_handle<synfigapp::CanvasInterface> canvas_interface):
 	Gtk::Grid(), /* 3 columns by 3 rows*/
 	Duckmatic(canvas_interface),
+	guide_dialog(*App::main_window,canvas_interface->get_canvas(),this),
 	canvas_interface(canvas_interface),
 	canvas(canvas_interface->get_canvas()),
 	drawing_area(0),
@@ -142,6 +136,7 @@ WorkArea::WorkArea(etl::loose_handle<synfigapp::CanvasInterface> canvas_interfac
 	drag_mode(DRAG_NONE),
 	active_bone_(0),
 	highlight_active_bone(false),
+	show_rulers(true),
 	show_grid(false),
 	show_guides(true),
 	background_size(15,15),
@@ -160,7 +155,6 @@ WorkArea::WorkArea(etl::loose_handle<synfigapp::CanvasInterface> canvas_interfac
 	allow_duck_clicks(true),
 	allow_bezier_clicks(true),
 	allow_layer_clicks(true),
-	curr_guide_is_x(false),
 	solid_lines(true),
 	timecode_width(0),
 	timecode_height(0),
@@ -226,16 +220,10 @@ WorkArea::WorkArea(etl::loose_handle<synfigapp::CanvasInterface> canvas_interfac
 
 	// Create the menu button
 
-	Gtk::Arrow *menubutton = manage(new Gtk::Arrow(Gtk::ARROW_RIGHT, Gtk::SHADOW_OUT));
-	menubutton->set_size_request(18, 18);
-	Gtk::EventBox *menubutton_box = manage(new Gtk::EventBox());
-	menubutton_box->add(*menubutton);
-	menubutton_box->add_events(Gdk::BUTTON_RELEASE_MASK);
-	menubutton_box->signal_button_release_event().connect(
-		sigc::bind_return(
-			sigc::hide(
-				sigc::mem_fun(*this, &WorkArea::popup_menu) ), true));
-	menubutton_box->set_hexpand(false);
+	menubutton_box = manage(new Gtk::Button());
+	menubutton_box->set_image_from_icon_name("pan-end-symbolic");
+	menubutton_box->set_relief(Gtk::RELIEF_NONE);
+	menubutton_box->signal_clicked().connect(sigc::mem_fun(*this, &WorkArea::popup_menu));
 	menubutton_box->show_all();
 
 	// Create scrollbars
@@ -293,9 +281,9 @@ WorkArea::WorkArea(etl::loose_handle<synfigapp::CanvasInterface> canvas_interfac
 	get_canvas()->signal_meta_data_changed("grid_color").connect(sigc::mem_fun(*this,&WorkArea::load_meta_data));
 	get_canvas()->signal_meta_data_changed("grid_snap").connect(sigc::mem_fun(*this,&WorkArea::load_meta_data));
 	get_canvas()->signal_meta_data_changed("grid_show").connect(sigc::mem_fun(*this,&WorkArea::load_meta_data));
+	get_canvas()->signal_meta_data_changed("status_ruler").connect(sigc::mem_fun(*this,&WorkArea::load_meta_data));
 	get_canvas()->signal_meta_data_changed("guide_show").connect(sigc::mem_fun(*this,&WorkArea::load_meta_data));
-	get_canvas()->signal_meta_data_changed("guide_x").connect(sigc::mem_fun(*this,&WorkArea::load_meta_data));
-	get_canvas()->signal_meta_data_changed("guide_y").connect(sigc::mem_fun(*this,&WorkArea::load_meta_data));
+	get_canvas()->signal_meta_data_changed("guide").connect(sigc::mem_fun(*this,&WorkArea::load_meta_data));
 	get_canvas()->signal_meta_data_changed("background_rendering").connect(sigc::mem_fun(*this,&WorkArea::load_meta_data));
 	get_canvas()->signal_meta_data_changed("onion_skin").connect(sigc::mem_fun(*this,&WorkArea::load_meta_data));
 	get_canvas()->signal_meta_data_changed("onion_skin_past").connect(sigc::mem_fun(*this,&WorkArea::load_meta_data));
@@ -319,10 +307,10 @@ WorkArea::WorkArea(etl::loose_handle<synfigapp::CanvasInterface> canvas_interfac
 
 	// Load sketch
 	{
-		String data(canvas->get_meta_data("sketch"));
+		filesystem::Path data(canvas->get_meta_data("sketch"));
 		if (!data.empty())
 			if (!load_sketch(data))
-				load_sketch(dirname(canvas->get_file_name()) + ETL_DIRECTORY_SEPARATOR + basename(data));
+				load_sketch(filesystem::Path::dirname(canvas->get_file_name()) + ETL_DIRECTORY_SEPARATOR + data.filename());
 	}
 
 	drawing_area->set_can_focus(true);
@@ -334,8 +322,8 @@ WorkArea::~WorkArea()
 	set_drag_mode(DRAG_NONE);
 	while(!renderer_set_.empty())
 		erase_renderer(*renderer_set_.begin());
-	if (getenv("SYNFIG_DEBUG_DESTRUCTORS"))
-		info("WorkArea::~WorkArea(): Deleted");
+	DEBUG_LOG("SYNFIG_DEBUG_DESTRUCTORS",
+		"WorkArea::~WorkArea(): Deleted");
 }
 
 void
@@ -371,6 +359,7 @@ WorkArea::save_meta_data()
 	canvas_interface->set_meta_data("guide_snap", get_guide_snap() ? "1" : "0");
 	canvas_interface->set_meta_data("guide_show", get_show_guides() ? "1" : "0");
 	canvas_interface->set_meta_data("grid_show", show_grid ? "1" : "0");
+	canvas_interface->set_meta_data("status_ruler", show_rulers ? "1" : "0");
 	canvas_interface->set_meta_data("jack_offset", strprintf("%f", (double)jack_offset));
 	canvas_interface->set_meta_data("onion_skin", onion_skin ? "1" : "0");
 	canvas_interface->set_meta_data("onion_skin_past", strprintf("%d", onion_skins[0]));
@@ -388,36 +377,21 @@ WorkArea::save_meta_data()
 	{
 		String data;
 		GuideList::const_iterator iter;
-		for(iter=get_guide_list_x().begin();iter!=get_guide_list_x().end();++iter)
-		{
-			if(!data.empty())
-				data+=' ';
-			data+=strprintf("%f",*iter);
+		for (const auto& guide : get_guide_list()){
+			data+=strprintf("%f*%f*%f", guide.point[0], guide.point[1], guide.angle.get());
+			data+=' ';
 		}
 		if(!data.empty())
-			canvas_interface->set_meta_data("guide_x",data);
-		else if (!canvas->get_meta_data("guide_x").empty())
-			canvas_interface->erase_meta_data("guide_x");
-
-		data.clear();
-		for(iter=get_guide_list_y().begin();iter!=get_guide_list_y().end();++iter)
-		{
-			if(!data.empty())
-				data+=' ';
-			data+=strprintf("%f",*iter);
-		}
-		if(!data.empty())
-			canvas_interface->set_meta_data("guide_y",data);
-		else if (!canvas->get_meta_data("guide_y").empty())
-			canvas_interface->erase_meta_data("guide_y");
+			canvas_interface->set_meta_data("guide",data);
+		else if (!canvas->get_meta_data("guide").empty())
+			canvas_interface->erase_meta_data("guide");
 	}
 
-	if(get_sketch_filename().size())
-	{
-		if(dirname(canvas->get_file_name())==dirname(get_sketch_filename()))
-			canvas_interface->set_meta_data("sketch",basename(get_sketch_filename()));
+	if (!get_sketch_filename().empty()) {
+		if (filesystem::Path::dirname(canvas->get_file_name()) == get_sketch_filename().parent_path())
+			canvas_interface->set_meta_data("sketch", get_sketch_filename().filename().u8string());
 		else
-			canvas_interface->set_meta_data("sketch",get_sketch_filename());
+			canvas_interface->set_meta_data("sketch", get_sketch_filename().u8string());
 	}
 
 	meta_data_lock=false;
@@ -547,6 +521,12 @@ WorkArea::load_meta_data()
 		set_guides_color(synfig::Color(gr,gg,gb));
 	}
 
+	data=canvas->get_meta_data("status_ruler");
+	if(data.size() && (data=="1" || data[0]=='t' || data[0]=='T'))
+		show_rulers=true;
+	if(data.size() && (data=="0" || data[0]=='f' || data[0]=='F'))
+		show_rulers=false;
+
 	data=canvas->get_meta_data("grid_show");
 	if(data.size() && (data=="1" || data[0]=='t' || data[0]=='T'))
 		show_grid=true;
@@ -626,41 +606,36 @@ WorkArea::load_meta_data()
 	if(data.size() && (data=="0" || data[0]=='f' || data[0]=='F'))
 		set_background_rendering(false);
 
-	data=canvas->get_meta_data("guide_x");
-	get_guide_list_x().clear();
+	//for the guide to be stored we have to store 2 floats x,y + 1 float angle in rad
+	data=canvas->get_meta_data("guide");
+	get_guide_list().clear();
 	while(!data.empty())
 	{
 		String::iterator iter(find(data.begin(),data.end(),' '));
-		String guide(data.begin(),iter);
-	    ChangeLocale change_locale(LC_NUMERIC, "C");
-
-		if(!guide.empty())
-			get_guide_list_x().push_back(stratof(guide));
+		String guide(data.begin(),iter);//this now contains the three items
+		std::vector<String> guide_components(3);
+		int i = 0;
+		for (auto character: guide){
+			if(character != '*')
+				guide_components.at(i).push_back(character);
+			else
+				++i;
+		}
+		if(i == 2){
+			ChangeLocale change_locale(LC_NUMERIC, "C");
+			Guide obj = { synfig::Point{stratof(guide_components.at(0)),stratof(guide_components.at(1))},
+						  synfig::Angle::rad(stratof(guide_components.at(2)))
+						};
+			get_guide_list().push_back(obj);
+		} else {
+			synfig::warning("Error on trying to restore guide meta data: got %d components", i+1);
+		}
 
 		if(iter==data.end())
 			data.clear();
 		else
 			data=String(iter+1,data.end());
 	}
-	//sort(get_guide_list_x());
-
-	data=canvas->get_meta_data("guide_y");
-	get_guide_list_y().clear();
-	while(!data.empty())
-	{
-		String::iterator iter(find(data.begin(),data.end(),' '));
-		String guide(data.begin(),iter);
-	    ChangeLocale change_locale(LC_NUMERIC, "C");
-
-		if(!guide.empty())
-			get_guide_list_y().push_back(stratof(guide));
-
-		if(iter==data.end())
-			data.clear();
-		else
-			data=String(iter+1,data.end());
-	}
-	//sort(get_guide_list_y());
 
 	data = canvas->get_meta_data("jack_offset");
 	if (!data.empty())
@@ -804,40 +779,13 @@ WorkArea::set_background_rendering(bool x)
 }
 
 void
-WorkArea::show_ruler()
+WorkArea::set_show_rulers(bool visible)
 {
-	if (ruler_status == true)
-		{
-			remove(*hruler);
-			remove(*vruler);
-			remove_row(0);
-			ruler_status= false;
-			std::cout<<"hide";
-		}
-		else {
-			insert_row(0);
-
-			//menu button box: have to redo it
-
-			Gtk::Arrow *menubutton = manage(new Gtk::Arrow(Gtk::ARROW_RIGHT, Gtk::SHADOW_OUT));
-			menubutton->set_size_request(18, 18);
-			Gtk::EventBox *menubutton_box = manage(new Gtk::EventBox());
-			menubutton_box->add(*menubutton);
-			menubutton_box->add_events(Gdk::BUTTON_RELEASE_MASK);
-			menubutton_box->signal_button_release_event().connect(
-				sigc::bind_return(
-					sigc::hide(
-						sigc::mem_fun(*this, &WorkArea::popup_menu) ), true));
-			menubutton_box->set_hexpand(false);
-			menubutton_box->show_all();
-
-			//insert back the menubutton box and rulers
-			attach(*menubutton_box, 0, 0, 1, 1);
-			attach_next_to(*hruler, *menubutton_box, Gtk::POS_RIGHT, 1, 1);
-			attach_next_to(*vruler, *menubutton_box, Gtk::POS_BOTTOM, 1, 1);
-
-			ruler_status= true;
-			}
+	show_rulers = visible;
+	hruler->set_visible(visible);
+	vruler->set_visible(visible);
+	menubutton_box->set_visible(visible);
+	save_meta_data();
 }
 
 void
@@ -974,8 +922,8 @@ const Cairo::RefPtr<Cairo::SurfacePattern>&
 WorkArea::get_background_pattern() const
 {
 	if (!background_pattern) {
-		int w = std::max(1, std::min(1000, (int)round(background_size[0])));
-		int h = std::max(1, std::min(1000, (int)round(background_size[1])));
+		int w = synfig::clamp(round_to_int(background_size[0]), 1, 1000);
+		int h = synfig::clamp(round_to_int(background_size[1]), 1, 1000);
 	    Cairo::RefPtr<Cairo::ImageSurface> surface = Cairo::ImageSurface::create(Cairo::FORMAT_RGB24, w*2, h*2);
 	    Cairo::RefPtr<Cairo::Context> context = Cairo::Context::create(surface);
 	    context->set_source_rgb(background_first_color.get_r(), background_first_color.get_g(), background_first_color.get_b());
@@ -1019,9 +967,16 @@ bool
 WorkArea::on_key_press_event(GdkEventKey* event)
 {
 	SYNFIG_EXCEPTION_GUARD_BEGIN()
-	if (Smach::RESULT_OK == canvas_view->get_smach().process_event(
-		EventKeyboard(EVENT_WORKAREA_KEY_DOWN, event->keyval, Gdk::ModifierType(event->state))))
-			return true;
+	if (guide_highlighted && (event->keyval == GDK_KEY_Control_L || event->keyval == GDK_KEY_Control_R))
+		rotate_guide=true;
+
+	auto event_result = canvas_view->get_smach().process_event(
+		EventKeyboard(EVENT_WORKAREA_KEY_DOWN, event->keyval, Gdk::ModifierType(event->state)));
+	if (event_result != Smach::RESULT_OK)
+		return true;
+
+	// Other possible actions if current state doesn't accept the event but not forbids it
+	// - Nudge selected ducks
 
 	if(get_selected_ducks().empty())
 		return false;
@@ -1076,8 +1031,15 @@ bool
 WorkArea::on_key_release_event(GdkEventKey* event)
 {
 	SYNFIG_EXCEPTION_GUARD_BEGIN()
-	return Smach::RESULT_OK == canvas_view->get_smach().process_event(
+	rotate_guide = false;
+	auto event_result = canvas_view->get_smach().process_event(
 		EventKeyboard(EVENT_WORKAREA_KEY_UP, event->keyval, Gdk::ModifierType(event->state)) );
+	if (event_result != Smach::RESULT_OK)
+		return true;
+
+	// Other possible actions if current state doesn't accept the event but not forbids it
+	// - currently none
+
 	SYNFIG_EXCEPTION_GUARD_END_BOOL(true)
 }
 
@@ -1095,32 +1057,11 @@ WorkArea::on_drawing_area_event(GdkEvent *event)
 	// Handle input stuff
 	if (event->any.type==GDK_MOTION_NOTIFY)
 	{
-		GdkDevice *device = event->motion.device;
+		GdkDevice *device = gdk_event_get_source_device(event);
 		modifier = Gdk::ModifierType(event->motion.state);
-
-		// Calculate the position of the
-		// input device in canvas coordinates
-
-		/*std::string axes_str;
-		int n_axes = gdk_device_get_n_axes(device);
-		for (int i=0; i < n_axes; i++)
-		{
-			axes_str += etl::strprintf(" %f", event->motion.axes[i]);
-		}
-		synfig::warning("axes info: %s", axes_str.c_str());*/
-		//for(...) axesstr += etl::strprintf(" %f", event->motion.axes[i])
-
-		double x = 0.0, y = 0.0, p = 0.0;
-		int ox = 0, oy = 0;
-		#ifndef _WIN32
-		Gtk::Container *toplevel = drawing_frame->get_toplevel();
-		if (toplevel) drawing_frame->translate_coordinates(*toplevel, 0, 0, ox, oy);
-		#endif
-
-		if (gdk_device_get_axis(device, event->motion.axes, GDK_AXIS_X, &x))
-			x -= ox; else x = event->motion.x;
-		if (gdk_device_get_axis(device, event->motion.axes, GDK_AXIS_Y, &y))
-			y -= oy; else y = event->motion.y;
+		double x = event->motion.x;
+		double y = event->motion.y;
+		double p = 0.0;
 
 		// Make sure we recognize the device
 		if(curr_input_device)
@@ -1143,10 +1084,9 @@ WorkArea::on_drawing_area_event(GdkEvent *event)
 
 		assert(curr_input_device);
 
-
-		//synfig::warning("coord (%3.f, %3.f) \t motion (%3.f, %3.f) / %s / axes(%d)", x, y, event->motion.x, event->motion.y, gdk_device_get_name(device), gdk_device_get_n_axes(device));
-		if (gdk_device_get_axis(device, event->motion.axes, GDK_AXIS_PRESSURE, &p))
-			p = std::max(0.0, (p - 0.04)/(1.0 - 0.04)); else p = 1.0;
+		if (!gdk_device_get_axis(device, event->motion.axes, GDK_AXIS_PRESSURE, &p)) {
+			p = 1.0;
+		}
 
 		if(std::isnan(x) || std::isnan(y) || std::isnan(p))
 			return false;
@@ -1160,29 +1100,16 @@ WorkArea::on_drawing_area_event(GdkEvent *event)
 		event->any.type==GDK_3BUTTON_PRESS ||
 		event->any.type==GDK_BUTTON_RELEASE )
 	{
-		GdkDevice *device = event->button.device;
+		GdkDevice *device = gdk_event_get_source_device(event);
 		modifier = Gdk::ModifierType(event->button.state);
 		drawing_area->grab_focus();
+		double x = event->button.x;
+		double y = event->button.y;
+		double p = 0.0;
 
-		// Calculate the position of the
-		// input device in canvas coordinates
-		// and the buttons
-
-		double x = 0.0, y = 0.0, p = 0.0;
-		int ox = 0, oy = 0;
-		#ifndef _WIN32
-		Gtk::Container *toplevel = drawing_frame->get_toplevel();
-		if (toplevel) drawing_frame->translate_coordinates(*toplevel, 0, 0, ox, oy);
-		#endif
-
-		if (gdk_device_get_axis(device, event->button.axes, GDK_AXIS_X, &x))
-			x -= ox; else x = event->button.x;
-		if (gdk_device_get_axis(device, event->button.axes, GDK_AXIS_Y, &y))
-			y -= oy; else y = event->button.y;
-		
-		//synfig::warning("coord2 (%3.f, %3.f) \t motion (%3.f, %3.f) / %s / axes(%d)", x, y, event->button.x, event->button.y, gdk_device_get_name(device), gdk_device_get_n_axes(device));
-		if (gdk_device_get_axis(device, event->button.axes, GDK_AXIS_PRESSURE, &p))
-			p = std::max(0.0, (p - 0.04)/(1.0 - 0.04)); else p = 1.0;
+		if (!gdk_device_get_axis(device, event->button.axes, GDK_AXIS_PRESSURE, &p)) {
+			p = 1.0;
+		}
 
 		// Make sure we recognize the device
 		if(curr_input_device)
@@ -1202,8 +1129,7 @@ WorkArea::on_drawing_area_event(GdkEvent *event)
 		}
 
 		assert(curr_input_device);
-			
-
+		
 		if(std::isnan(x) || std::isnan(y) || std::isnan(p))
 			return false;
 
@@ -1228,18 +1154,15 @@ WorkArea::on_drawing_area_event(GdkEvent *event)
 
 	// Handle the renderables
 	{
-		std::set<etl::handle<WorkAreaRenderer> >::iterator iter;
-		for(iter=renderer_set_.begin();iter!=renderer_set_.end();++iter)
-		{
-			if((*iter)->get_enabled())
-				if((*iter)->event_vfunc(event))
-				{
+		for (const auto& workarea_renderer : renderer_set_) {
+			if (workarea_renderer->get_enabled()) {
+				if (workarea_renderer->event_vfunc(event)) {
 					// Event handled. Return true.
 					return true;
 				}
+			}
 		}
 	}
-
 	// Event hasn't been handled, pass it down
 	switch(event->type) {
 	case GDK_2BUTTON_PRESS: {
@@ -1250,12 +1173,17 @@ WorkArea::on_drawing_area_event(GdkEvent *event)
 			} else if (event_result == Smach::RESULT_OK) {
 				set_drag_mode(DRAG_NONE);
 
-				if (etl::handle<Bezier> bezier = find_bezier(mouse_pos, radius, &bezier_click_pos)) {
+				if (Bezier::Handle bezier = find_bezier(mouse_pos, radius, &bezier_click_pos)) {
 					if (selected_bezier == bezier) {
 						bezier->signal_user_doubleclick(1)(bezier_click_pos);
 						return true;
 					}
 				}
+			}
+			if(guide_highlighted){
+				guide_dialog.show();
+				guide_dialog.set_current_guide(curr_guide);
+				return true;
 			}
 		}
 		break;
@@ -1263,7 +1191,7 @@ WorkArea::on_drawing_area_event(GdkEvent *event)
 	case GDK_BUTTON_PRESS: {
 		switch(button_pressed) {
 		case 1:	{ // Attempt to click on a duck
-			etl::handle<Duck> duck;
+			Duck::Handle duck;
 			set_drag_mode(DRAG_NONE);
 
 			if(allow_duck_clicks) {
@@ -1372,15 +1300,9 @@ WorkArea::on_drawing_area_event(GdkEvent *event)
 
 				// Check for a guide click
 				if (show_guides) {
-					GuideList::iterator iter = find_guide_x(mouse_pos,radius);
-					if (iter == get_guide_list_x().end()) {
-						curr_guide_is_x = false;
-						iter = find_guide_y(mouse_pos,radius);
-					} else {
-						curr_guide_is_x = true;
-					}
+					GuideList::iterator iter = find_guide(mouse_pos,radius);
 
-					if (iter != get_guide_list_x().end() && iter != get_guide_list_y().end()) {
+					if (iter != get_guide_list().end()) {
 						set_drag_mode(DRAG_GUIDE);
 						curr_guide = iter;
 						return true;
@@ -1396,12 +1318,12 @@ WorkArea::on_drawing_area_event(GdkEvent *event)
 			break;
 		}
 		case 2:	{ // Attempt to drag and move the window
-			etl::handle<Duck> duck = find_duck(mouse_pos, radius);
-			etl::handle<Bezier> bezier = find_bezier(mouse_pos, radius, &bezier_click_pos);
-			if (duck)
+			cancel_drag_on_mBtn_press();
+
+			if (Duck::Handle duck = find_duck(mouse_pos, radius))
 				duck->signal_user_click(1)();
 			else
-			if(bezier)
+			if(Bezier::Handle bezier = find_bezier(mouse_pos, radius, &bezier_click_pos))
 				bezier->signal_user_click(1)(bezier_click_pos);
 
 			if (canvas_view->get_smach().process_event(EventMouse(EVENT_WORKAREA_MOUSE_BUTTON_DOWN,BUTTON_MIDDLE,mouse_pos,pressure,modifier))==Smach::RESULT_OK) {
@@ -1416,7 +1338,9 @@ WorkArea::on_drawing_area_event(GdkEvent *event)
 			break;
 		}
 		case 3:	{ // Attempt to either get info on a duck, or open the menu
-			if (etl::handle<Duck> duck = find_duck(mouse_pos, radius)) {
+			cancel_drag_on_mBtn_press();
+
+			if (Duck::Handle duck = find_duck(mouse_pos, radius)) {
 				if (get_selected_ducks().size() <= 1)
 					duck->signal_user_click(2)();
 				else
@@ -1424,8 +1348,29 @@ WorkArea::on_drawing_area_event(GdkEvent *event)
 				return true;
 			}
 
-			if (etl::handle<Bezier> bezier = find_bezier(mouse_pos, radius, &bezier_click_pos)) {
+			if (Bezier::Handle bezier = find_bezier(mouse_pos, radius, &bezier_click_pos)) {
 				bezier->signal_user_click(2)(bezier_click_pos);
+				return true;
+			}
+
+			if(guide_highlighted){
+				Gtk::Menu* guide_menu(manage(new Gtk::Menu()));
+				guide_menu->signal_hide().connect(sigc::bind(sigc::ptr_fun(&delete_widget), guide_menu));
+				Gtk::MenuItem *item = manage(new Gtk::MenuItem(_("_Edit Guide")));
+				item->set_use_underline(true);
+				item->show();
+				item->signal_activate().connect(
+						sigc::mem_fun(guide_dialog,&Gtk::Widget::show));
+				guide_menu->append(*item);
+				item = manage(new Gtk::MenuItem(_("_Delete")));
+				item->set_use_underline(true);
+				item->show();
+				item->signal_activate().connect(sigc::track_obj([this](){
+					get_guide_list().erase(this->curr_guide);
+				}, *this));
+				guide_menu->append(*item);
+				guide_menu->popup(3, gtk_get_current_event_time());
+				guide_dialog.set_current_guide(curr_guide);
 				return true;
 			}
 
@@ -1465,16 +1410,16 @@ WorkArea::on_drawing_area_event(GdkEvent *event)
 		// Guide/Duck highlights on hover
 		switch(get_drag_mode()) {
 		case DRAG_NONE: {
-            GuideList::iterator iter = find_guide_x(mouse_pos,radius);
-            if (iter == get_guide_list_x().end())
-                iter = find_guide_y(mouse_pos, radius);
+			GuideList::iterator iter = find_guide(mouse_pos,radius);
 
-            if (iter != curr_guide) {
-                curr_guide = iter;
-                drawing_area->queue_draw();
-            }
+			if (iter != curr_guide) {
+				curr_guide = iter;
+				drawing_area->queue_draw();
+			}
 
-            etl::handle<Duck> duck = find_duck(mouse_pos, radius);
+			guide_highlighted = iter != get_guide_list().end();
+
+            Duck::Handle duck = find_duck(mouse_pos, radius);
             if (duck != hover_duck) {
                 hover_duck = duck;
                 drawing_area->queue_draw();
@@ -1516,10 +1461,14 @@ WorkArea::on_drawing_area_event(GdkEvent *event)
 	        break;
 		}
 		case DRAG_GUIDE: {
-			if(curr_guide_is_x)
-				*curr_guide = mouse_pos[0];
-			else
-				*curr_guide = mouse_pos[1];
+			if (!rotate_guide){
+				curr_guide->point[0] = mouse_pos[0];
+				curr_guide->point[1] = mouse_pos[1];
+			} else if(rotate_guide && !from_ruler_event) {
+					float slope = (mouse_pos[1] - curr_guide->point[1])/(mouse_pos[0] - curr_guide->point[0]);
+					//just change the angle of the ruler
+					curr_guide->angle = synfig::Angle::rad(atan(slope));
+			}
 			drawing_area->queue_draw();
 	        break;
 		}
@@ -1560,11 +1509,8 @@ WorkArea::on_drawing_area_event(GdkEvent *event)
 			double y(event->button.y), x(event->button.x);
 
 			// Erase the guides if dragged into the rulers
-			if(curr_guide_is_x && !std::isnan(x) && x<0.0 )
-				get_guide_list_x().erase(curr_guide);
-			else
-			if(!curr_guide_is_x && !std::isnan(y) && y<0.0 )
-				get_guide_list_y().erase(curr_guide);
+			if((!std::isnan(x) && x<0.0) || (!std::isnan(y) && y<0.0))
+				get_guide_list().erase(curr_guide);
 
 			drawing_area->queue_draw();
 			set_drag_mode(DRAG_NONE);
@@ -1801,15 +1747,16 @@ WorkArea::on_hruler_event(GdkEvent *event)
 	SYNFIG_EXCEPTION_GUARD_BEGIN()
 	switch(event->type) {
 	case GDK_BUTTON_PRESS:
+		from_ruler_event = true;
 		if (get_drag_mode() == DRAG_NONE && show_guides) {
 			set_drag_mode(DRAG_GUIDE);
-			curr_guide = get_guide_list_y().insert(get_guide_list_y().begin(), 0.0);
-			curr_guide_is_x = false;
+			curr_guide = get_guide_list().insert(get_guide_list().begin(),{synfig::Point(((1.0/2.0)*(drawing_area->get_window()->get_width())*get_pw())+ get_window_tl()[0], 0),
+																			   synfig::Angle::rad(0)});
 		}
 		return true;
 	case GDK_MOTION_NOTIFY:
 		// Guide movement
-		if (get_drag_mode() == DRAG_GUIDE && !curr_guide_is_x) {
+		if (get_drag_mode() == DRAG_GUIDE) {
 			// Event is in the hruler, which has a slightly different
 			// coordinate system from the canvas.
 			event->motion.y -= hruler->get_height()+2;
@@ -1819,10 +1766,10 @@ WorkArea::on_hruler_event(GdkEvent *event)
 		}
 		return true;
 	case GDK_BUTTON_RELEASE:
-		if (get_drag_mode() == DRAG_GUIDE && !curr_guide_is_x) {
+		from_ruler_event = false;
+		if (get_drag_mode() == DRAG_GUIDE) {
 			set_drag_mode(DRAG_NONE);
 			save_meta_data();
-			//get_guide_list_y().erase(curr_guide);
 		}
 		return true;
 	default:
@@ -1838,28 +1785,28 @@ WorkArea::on_vruler_event(GdkEvent *event)
 	SYNFIG_EXCEPTION_GUARD_BEGIN()
 	switch(event->type) {
 	case GDK_BUTTON_PRESS:
+		from_ruler_event = true;
 		if (get_drag_mode() == DRAG_NONE && show_guides) {
 			set_drag_mode(DRAG_GUIDE);
-			curr_guide=get_guide_list_x().insert(get_guide_list_x().begin(),0.0);
-			curr_guide_is_x=true;
+			curr_guide = get_guide_list().insert(get_guide_list().begin(),{synfig::Point(0 ,((1.0/2.0)*(drawing_area->get_window()->get_height())*get_ph())+ get_window_tl()[1]),
+																			   synfig::Angle::deg(90)});
 		}
 		return true;
 	case GDK_MOTION_NOTIFY:
 		// Guide movement
-		if (get_drag_mode() == DRAG_GUIDE && curr_guide_is_x) {
+		if (get_drag_mode() == DRAG_GUIDE) {
 			// Event is in the vruler, which has a slightly different
 			// coordinate system from the canvas.
 			event->motion.x -= vruler->get_width()+2;
-
 			// call the on drawing area event to refresh everything.
 			return on_drawing_area_event(event);
 		}
 		return true;
 	case GDK_BUTTON_RELEASE:
-		if (get_drag_mode() == DRAG_GUIDE && curr_guide_is_x) {
+		from_ruler_event = false;
+		if (get_drag_mode() == DRAG_GUIDE) {
 			set_drag_mode(DRAG_NONE);
 			save_meta_data();
-			//get_guide_list_x().erase(curr_guide);
 		}
 		return true;
 	default:
@@ -1870,7 +1817,7 @@ WorkArea::on_vruler_event(GdkEvent *event)
 }
 
 void
-WorkArea::on_duck_selection_single(const etl::handle<Duck>& duck)
+WorkArea::on_duck_selection_single(const Duck::Handle& duck)
 {
 	if (get_drag_mode() == DRAG_NONE) {
 		studio::LayerTree* tree_layer(dynamic_cast<studio::LayerTree*>(canvas_view->get_ext_widget("layers_cmp")));
@@ -1994,7 +1941,7 @@ WorkArea::refresh(const Cairo::RefPtr<Cairo::Context> &/*cr*/)
 
 	assert(get_canvas());
 
-	//!Check if the window we want draw is ready
+	// Check if the window we want draw is ready
 	Glib::RefPtr<Gdk::Window> draw_area_window = drawing_area->get_window();
 	if (!draw_area_window) return false;
 
@@ -2005,14 +1952,13 @@ WorkArea::refresh(const Cairo::RefPtr<Cairo::Context> &/*cr*/)
 
 	// Draw out the renderables
 	{
-		std::set<etl::handle<WorkAreaRenderer> >::iterator iter;
-		for(iter=renderer_set_.begin();iter!=renderer_set_.end();++iter)
-		{
-			if((*iter)->get_enabled())
-				(*iter)->render_vfunc(
+		for (const auto& workarea_renderer : renderer_set_) {
+			if (workarea_renderer->get_enabled()) {
+				workarea_renderer->render_vfunc(
 					draw_area_window,
 					Gdk::Rectangle(0, 0, draw_area_window->get_width(), draw_area_window->get_height())
 				);
+			}
 		}
 	}
 
@@ -2044,7 +1990,7 @@ WorkArea::get_renderer() const
 {
 	if (get_low_resolution_flag())
 	{
-		String renderer = etl::strprintf("software-low%d", get_low_res_pixel_size());
+		String renderer = synfig::strprintf("software-low%d", get_low_res_pixel_size());
 		if (synfig::rendering::Renderer::get_renderers().count(renderer))
 			return renderer;
 	}
@@ -2253,7 +2199,7 @@ studio::WorkArea::reset_cursor()
 void
 studio::WorkArea::set_zoom(float z)
 {
-	z=std::max(1.0f/128.0f,std::min(128.0f,z));
+	z=synfig::clamp(z,1.0f/128.0f,128.0f);
 	zoomdial->set_zoom(z);
 	if(z==zoom)
 		return;
@@ -2269,7 +2215,7 @@ studio::WorkArea::set_zoom(float z)
 }
 
 void
-WorkArea::set_selected_value_node(etl::loose_handle<synfig::ValueNode> x)
+WorkArea::set_selected_value_node(synfig::ValueNode::LooseHandle x)
 {
 	if(x!=selected_value_node_)
 	{
@@ -2279,7 +2225,16 @@ WorkArea::set_selected_value_node(etl::loose_handle<synfig::ValueNode> x)
 }
 
 void
-WorkArea::set_active_bone_value_node(etl::loose_handle<synfig::ValueNode> x)
+WorkArea::cancel_drag_on_mBtn_press()
+{
+	if (get_drag_mode() == DRAG_DUCK || get_drag_mode() == DRAG_BEZIER) {
+		set_drag_mode(DRAG_NONE);
+		canvas_view->queue_rebuild_ducks();
+	}
+}
+
+void
+WorkArea::set_active_bone_value_node(synfig::ValueNode::LooseHandle x)
 {
 	if(x!=active_bone_)
 	{

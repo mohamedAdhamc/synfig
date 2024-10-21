@@ -80,9 +80,9 @@ using namespace studio;
 struct Widget_Curves::Channel
 {
 	String name;
-	Gdk::Color color;
+	Gdk::RGBA color;
 	std::map<Real, Real> values;
-	explicit Channel(const String &name = String(), const Gdk::Color &color = Gdk::Color()):
+	explicit Channel(const String &name = String(), const Gdk::RGBA& color = Gdk::RGBA()):
 		name(name), color(color) { }
 };
 
@@ -92,10 +92,10 @@ struct Widget_Curves::CurveStruct: sigc::trackable
 	ValueDesc value_desc;
 	std::vector<Channel> channels;
 
-	void add_channel(const String &name, const Gdk::Color &color)
+	void add_channel(const String &name, const Gdk::RGBA& color)
 		{ channels.push_back(Channel(name, color)); }
 	void add_channel(const String &name, const String &color)
-		{ add_channel(name, Gdk::Color(color)); }
+		{ add_channel(name, Gdk::RGBA(color)); }
 
 	CurveStruct() { }
 
@@ -558,10 +558,10 @@ Widget_Curves::set_value_descs(etl::handle<synfigapp::CanvasInterface> canvas_in
 	}
 	clear();
 	CurveStruct curve_struct;
-	for(auto it = data.begin(); it != data.end(); ++it) {
-		const ValueDesc *i = &it->second;
+	for(const auto& item : data) {
+		const ValueDesc* i = &item.second;
 
-		curve_struct.name = it->first;
+		curve_struct.name = item.first;
 		curve_struct.init(*i);
 		if (curve_struct.channels.empty())
 			continue;
@@ -672,9 +672,9 @@ Widget_Curves::on_draw(const Cairo::RefPtr<Cairo::Context> &cr)
 
 	// draw overlapped waypoints
 	cr->set_line_width(.4);
-	for (auto it : overlapped_waypoints) {
+	for (const auto& it : overlapped_waypoints) {
 		const Waypoint &waypoint = it.first;
-		const auto &curve_it = it.second;
+		const auto& curve_it = it.second;
 		const size_t num_channels = curve_it->channels.size();
 
 		const int x = time_plot_data->get_pixel_t_coord(waypoint.get_time());
@@ -691,7 +691,7 @@ Widget_Curves::on_draw(const Cairo::RefPtr<Cairo::Context> &cr)
 			range_max = std::max(range_max, old_value);
 			range_min = std::min(range_min, old_value);
 
-			Gdk::Cairo::set_source_color(cr, curve_it->channels[c].color);
+			Gdk::Cairo::set_source_rgba(cr, curve_it->channels[c].color);
 			cr->move_to(x, y);
 			cr->line_to(x, old_y);
 			cr->stroke();
@@ -712,7 +712,7 @@ Widget_Curves::on_draw(const Cairo::RefPtr<Cairo::Context> &cr)
 			points[c].reserve(w);
 		}
 
-		Time t = time_plot_data->lower;
+		Time t = time_plot_data->lower_ex;
 		for(int j = 0; j < w; ++j, t += time_plot_data->dt) {
 			for(size_t c = 0; c < channels; ++c) {
 				Real y = curve_it->get_value(c, t, time_plot_data->dt);
@@ -747,7 +747,7 @@ Widget_Curves::on_draw(const Cairo::RefPtr<Cairo::Context> &cr)
 				if (p_it->get_x() >= last_timepoint_pixel)
 					break;
 			}
-			Gdk::Cairo::set_source_color(cr, curve_it->channels[c].color);
+			Gdk::Cairo::set_source_rgba(cr, curve_it->channels[c].color);
 			cr->stroke();
 
 			// Draw the remaining curve
@@ -818,7 +818,7 @@ Widget_Curves::on_draw(const Cairo::RefPtr<Cairo::Context> &cr)
 	}
 
 	// Draw info about hovered item
-	if (channel_point_sd.get_hovered_item().is_valid() || channel_point_sd.get_state() == channel_point_sd.POINTER_DRAGGING) {
+	if (channel_point_sd.has_hovered_item() || channel_point_sd.get_state() == channel_point_sd.POINTER_DRAGGING) {
 		const ChannelPoint* inspected_item = &channel_point_sd.get_hovered_item();
 		if (!inspected_item->is_valid() || channel_point_sd.get_state() == channel_point_sd.POINTER_DRAGGING)
 			inspected_item = channel_point_sd.get_active_item();
@@ -1110,20 +1110,20 @@ void Widget_Curves::ChannelPointSD::delta_drag(int total_dx, int total_dy, bool 
 		// So, any selected channel point shouldn't be moved vertically: it is strange in UX point of view
 		if (get_active_item()->is_draggable()) {
 			std::map< long, std::map< Time, std::vector<ChannelPoint*> > > selection_tree;
-			for (auto point : selection) {
+			for (const auto& point : selection) {
 				// If it is a converted parameter (and not its inner parameter), its Y value can't be changed
 				if (point->is_draggable())
 					selection_tree[std::distance(widget.curve_list.begin(), point->curve_it)][point->time_point.get_time()].push_back(point);
 			}
 
-			for (const auto &curve : selection_tree) {
-				for (auto tt : curve.second) {
+			for (const auto& curve : selection_tree) {
+				for (const auto& tt : curve.second) {
 					auto time = tt.first;
 					auto channels = tt.second;
 					auto refpoint = channels.front();
 					ValueBase value_base = refpoint->curve_it->value_desc.get_value(time);
 
-					for (auto point : channels) {
+					for (const auto& point : channels) {
 						// Clear cached values due to precision error while dragging multiple points
 						point->curve_it->channels[point->channel_idx].values.clear();
 
@@ -1218,15 +1218,15 @@ void Widget_Curves::ChannelPointSD::delta_drag(int total_dx, int total_dy, bool 
 
 		if (!ignore_move) {
 			// first we move waypoints
-			for (const auto &info : times_to_move)
+			for (const auto& info : times_to_move)
 				widget.canvas_interface->waypoint_move(info.first, info.second, deltatime);
 			// now we update cached values in select-drag handler
-			for (auto pair : timepoints_to_update)
+			for (const auto& pair : timepoints_to_update)
 				pair.first->time_point = TimePoint(pair.second);
 		}
 
 		// Now we can restore previously overlapped waypoints
-		for (auto it : waypoints_to_restore) {
+		for (const auto& it : waypoints_to_restore) {
 			Action::Handle 	action(Action::create("WaypointAdd"));
 
 			assert(action);

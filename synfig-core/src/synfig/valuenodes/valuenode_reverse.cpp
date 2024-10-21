@@ -52,7 +52,6 @@
 #include <synfig/general.h>
 #include <synfig/localization.h>
 #include <synfig/valuenode_registry.h>
-#include <ETL/misc>
 
 #include <algorithm>
 
@@ -66,7 +65,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Reverse, RELEASE_VERSION_1_0_2, "reverse", "Reverse")
+REGISTER_VALUENODE(ValueNode_Reverse, RELEASE_VERSION_1_0_2, "reverse", N_("Reverse"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -75,13 +74,13 @@ REGISTER_VALUENODE(ValueNode_Reverse, RELEASE_VERSION_1_0_2, "reverse", "Reverse
 ValueNode_Reverse::ValueNode_Reverse(Type &x):
 	LinkableValueNode(x)
 {
+	init_children_vocab();
 }
 
 ValueNode_Reverse::ValueNode_Reverse(const ValueBase &x):
 	LinkableValueNode(x.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	Type &type(x.get_type());
 	if(x.empty()) {
 		set_link("link", ValueNode_Const::create(x));
@@ -268,8 +267,8 @@ reverse_value(const ValueBase &value)
 ValueBase
 ValueNode_Reverse::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	return reverse_value((*link_)(t));
 }
@@ -299,7 +298,7 @@ ValueNode_Reverse::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"link")
+	ret.push_back(ParamDesc("link")
 		.set_local_name(_("Link"))
 		.set_description(_("The value to be reversed"))
 	);

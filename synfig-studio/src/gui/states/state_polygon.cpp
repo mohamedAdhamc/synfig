@@ -57,7 +57,6 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 using namespace studio;
 
@@ -66,12 +65,8 @@ using namespace studio;
 #define DISTINGUISH_FIRST_DUCK
 
 #ifndef LAYER_CREATION
-#define LAYER_CREATION(button, stockid, tooltip)	\
-	{ \
-		Gtk::Image *icon = manage(new Gtk::Image(Gtk::StockID(stockid), \
-			Gtk::ICON_SIZE_SMALL_TOOLBAR)); \
-		button.add(*icon); \
-	} \
+#define LAYER_CREATION(button, icon_name, tooltip)	\
+	button.set_image_from_icon_name(icon_name, Gtk::BuiltinIconSize::ICON_SIZE_SMALL_TOOLBAR); \
 	button.set_relief(Gtk::RELIEF_NONE); \
 	button.set_tooltip_text(tooltip) ;\
 	button.signal_toggled().connect(sigc::mem_fun(*this, \
@@ -88,7 +83,7 @@ StatePolygon studio::state_polygon;
 
 class studio::StatePolygon_Context : public sigc::trackable
 {
-	etl::handle<CanvasView> canvas_view_;
+	CanvasView::Handle canvas_view_;
 	CanvasView::IsWorking is_working;
 
 	bool prev_table_status;
@@ -226,7 +221,7 @@ public:
 
 	~StatePolygon_Context();
 
-	const etl::handle<CanvasView>& get_canvas_view()const{return canvas_view_;}
+	const CanvasView::Handle& get_canvas_view()const{return canvas_view_;}
 	etl::handle<synfigapp::CanvasInterface> get_canvas_interface()const{return canvas_view_->canvas_interface();}
 	synfig::Canvas::Handle get_canvas()const{return canvas_view_->get_canvas();}
 	WorkArea * get_work_area()const{return canvas_view_->get_work_area();}
@@ -252,7 +247,7 @@ public:
 /* === M E T H O D S ======================================================= */
 
 StatePolygon::StatePolygon():
-	Smach::state<StatePolygon_Context>("polygon")
+	Smach::state<StatePolygon_Context>("polygon", N_("Polygon Tool"))
 {
 	insert(event_def(EVENT_LAYER_SELECTION_CHANGED,&StatePolygon_Context::event_layer_selection_changed_handler));
 	insert(event_def(EVENT_STOP,&StatePolygon_Context::event_stop_handler));
@@ -283,9 +278,9 @@ StatePolygon_Context::load_settings()
 
 		set_opacity(settings.get_value("polygon.opacity", 1.0));
 
-		set_bline_width(settings.get_value("polygon.bline_width", Distance("1px")));
+		set_bline_width(settings.get_value("polygon.bline_width", Distance("1px")).as(App::distance_system, get_canvas()->rend_desc()));
 
-		set_feather_size(settings.get_value("polygon.feather", Distance("0px")));
+		set_feather_size(settings.get_value("polygon.feather", Distance("0px")).as(App::distance_system, get_canvas()->rend_desc()));
 
 		set_invert(settings.get_value("polygon.invert", false));
 
@@ -426,17 +421,17 @@ StatePolygon_Context::StatePolygon_Context(CanvasView* canvas_view):
 	layer_types_label.set_valign(Gtk::ALIGN_CENTER);
 
 	LAYER_CREATION(layer_polygon_togglebutton,
-		("synfig-layer_geometry_polygon"), _("Create a polygon layer"));
+		"layer_geometry_polygon_icon", _("Create a polygon layer"));
 	LAYER_CREATION(layer_region_togglebutton,
-		("synfig-layer_geometry_region"), _("Create a region layer"));
+		"layer_geometry_region_icon", _("Create a region layer"));
 	LAYER_CREATION(layer_outline_togglebutton,
-		("synfig-layer_geometry_outline"), _("Create an outline layer"));
+		"layer_geometry_outline_icon", _("Create an outline layer"));
 	LAYER_CREATION(layer_advanced_outline_togglebutton,
-		("synfig-layer_geometry_advanced_outline"), _("Create an advanced outline layer"));
+		"layer_geometry_advanced_outline_icon", _("Create an advanced outline layer"));
 	LAYER_CREATION(layer_plant_togglebutton,
-		("synfig-layer_other_plant"), _("Create a plant layer"));
+		"layer_other_plant_icon", _("Create a plant layer"));
 	LAYER_CREATION(layer_curve_gradient_togglebutton,
-		("synfig-layer_gradient_curve"), _("Create a gradient layer"));
+		"layer_gradient_curve_icon", _("Create a gradient layer"));
 
 	layer_polygon_togglebutton.get_style_context()->add_class("indentation");
 
@@ -453,7 +448,7 @@ StatePolygon_Context::StatePolygon_Context(CanvasView* canvas_view):
 	blend_label.get_style_context()->add_class("gap");
 	blend_box.pack_start(blend_label, false, false, 0);
 
-	blend_enum.set_param_desc(ParamDesc(Color::BLEND_COMPOSITE,"blend_method")
+	blend_enum.set_param_desc(ParamDesc("blend_method")
 		.set_local_name(_("Blend Method"))
 		.set_description(_("Defines the blend method to be used for polygons")));
 
@@ -571,7 +566,7 @@ StatePolygon_Context::refresh_tool_options()
 	App::dialog_tool_options->set_icon("tool_polyline_icon");
 
 	App::dialog_tool_options->add_button(
-		Gtk::StockID("gtk-execute"),
+		"system-run",
 		_("Make Polygon")
 	)->signal_clicked().connect(
 		sigc::mem_fun(
@@ -581,7 +576,7 @@ StatePolygon_Context::refresh_tool_options()
 	);
 
 	App::dialog_tool_options->add_button(
-		Gtk::StockID("gtk-clear"),
+		"edit-clear",
 		_("Clear current Polygon")
 	)->signal_clicked().connect(
 		sigc::mem_fun(

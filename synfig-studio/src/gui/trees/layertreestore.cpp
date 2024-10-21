@@ -83,9 +83,8 @@ retrieve_layers_from_dragging(const Gtk::SelectionData &selection_data, synfigap
 
 static LayerTreeStore::Model& ModelHack()
 {
-	static LayerTreeStore::Model* model(0);
-	if(!model)model=new LayerTreeStore::Model;
-	return *model;
+	static LayerTreeStore::Model model;
+	return model;
 }
 
 LayerTreeStore::LayerTreeStore(etl::loose_handle<synfigapp::CanvasInterface> canvas_interface_):
@@ -93,7 +92,6 @@ LayerTreeStore::LayerTreeStore(etl::loose_handle<synfigapp::CanvasInterface> can
 	queued					(false),
 	canvas_interface_		(canvas_interface_)
 {
-	layer_icon=Gtk::Button().render_icon_pixbuf(Gtk::StockID("synfig-layer"),Gtk::ICON_SIZE_SMALL_TOOLBAR);
 
 	// Connect Signals to Terminals
 	canvas_interface()->signal_layer_status_changed().connect(sigc::mem_fun(*this,&studio::LayerTreeStore::on_layer_status_changed));
@@ -121,8 +119,8 @@ LayerTreeStore::LayerTreeStore(etl::loose_handle<synfigapp::CanvasInterface> can
 
 LayerTreeStore::~LayerTreeStore()
 {
-	if (getenv("SYNFIG_DEBUG_DESTRUCTORS"))
-		synfig::info("LayerTreeStore::~LayerTreeStore(): Deleted");
+	DEBUG_LOG("SYNFIG_DEBUG_DESTRUCTORS",
+		"LayerTreeStore::~LayerTreeStore(): Deleted");
 }
 
 int
@@ -167,7 +165,7 @@ LayerTreeStore::create(etl::loose_handle<synfigapp::CanvasInterface> canvas_inte
 }
 
 template<typename T>
-void LayerTreeStore::set_gvalue_tpl(Glib::ValueBase& value, const T &v, bool use_assign_operator) const
+void LayerTreeStore::set_gvalue_tpl(Glib::ValueBase& value, const T& v, bool use_assign_operator) const
 {
 	Glib::Value<T> x;
 	g_value_init(x.gobj(), x.value_type());
@@ -182,7 +180,7 @@ void LayerTreeStore::set_gvalue_tpl(Glib::ValueBase& value, const T &v, bool use
 }
 
 void
-LayerTreeStore::get_value_vfunc(const Gtk::TreeModel::iterator& iter, int column, Glib::ValueBase& value)const
+LayerTreeStore::get_value_vfunc(const Gtk::TreeModel::iterator& iter, int column, Glib::ValueBase& value) const
 {
 	if ( column != model.record_type.index()
 	  && column != model.layer.index()
@@ -239,19 +237,19 @@ LayerTreeStore::get_value_vfunc(const Gtk::TreeModel::iterator& iter, int column
 			{
 				Pango::Weight weight = Pango::WEIGHT_NORMAL;
 
-				etl::handle<Layer_PasteCanvas> paste=
-					etl::handle<Layer_PasteCanvas>::cast_dynamic(
+				Layer_PasteCanvas::Handle paste=
+					Layer_PasteCanvas::Handle::cast_dynamic(
 						layer->get_parent_paste_canvas_layer() );
 				if(paste)
 				{
-					//etl::handle<synfig::Canvas> sub_canvas=paste->get_param("canvas").get(sub_canvas);
+					//Canvas::Handle sub_canvas=paste->get_param("canvas").get(sub_canvas);
 					Canvas::Handle sub_canvas=paste->get_param("canvas").get(Canvas::Handle());
 					if(sub_canvas && !sub_canvas->is_inline())
 					{
 						Gtk::TreeRow row=*iter;
 						if(*row.parent() && RECORD_TYPE_LAYER == (RecordType)(*row.parent())[model.record_type])
 						{
-							paste = etl::handle<Layer_PasteCanvas>::cast_dynamic(
+							paste = Layer_PasteCanvas::Handle::cast_dynamic(
 									Layer::Handle((*row.parent())[model.layer]) );
 						}
 					}
@@ -274,8 +272,8 @@ LayerTreeStore::get_value_vfunc(const Gtk::TreeModel::iterator& iter, int column
 			if (column == model.strikethrough.index())
 				set_gvalue_tpl<bool>(value, false);
 			else
-			if (column == model.icon.index())
-				set_gvalue_tpl< Glib::RefPtr<Gdk::Pixbuf> >(value, get_tree_pixbuf_layer(layer->get_name()));
+			if (column == model.icon_name.index())
+				set_gvalue_tpl<Glib::ustring>(value, layer_icon_name(layer->get_name()), true);
 			else
 				Gtk::TreeStore::get_value_vfunc(iter,column,value);
 
@@ -309,8 +307,8 @@ LayerTreeStore::get_value_vfunc(const Gtk::TreeModel::iterator& iter, int column
 				set_gvalue_tpl<Pango::Weight>(value, weight);
 			}
 			else
-			if (column == model.icon.index())
-				set_gvalue_tpl< Glib::RefPtr<Gdk::Pixbuf> >(value, get_tree_pixbuf_layer("ghost_group"));
+			if (column == model.icon_name.index())
+				set_gvalue_tpl<Glib::ustring>(value, layer_icon_name("ghost_group"), true);
 			else
 				Gtk::TreeStore::get_value_vfunc(iter,column,value);
 
@@ -467,7 +465,7 @@ LayerTreeStore::set_value_impl(const Gtk::TreeModel::iterator& iter, int column,
 }
 
 bool
-LayerTreeStore::row_draggable_vfunc(const TreeModel::Path& path)const
+LayerTreeStore::row_draggable_vfunc(const TreeModel::Path& path) const
 {
 	Gtk::TreeIter iter = const_cast<LayerTreeStore*>(this)->get_iter(path);
 	if (!iter) return false;
@@ -479,7 +477,7 @@ LayerTreeStore::row_draggable_vfunc(const TreeModel::Path& path)const
 }
 
 bool
-LayerTreeStore::drag_data_get_vfunc(const TreeModel::Path& path, Gtk::SelectionData& selection_data)const
+LayerTreeStore::drag_data_get_vfunc(const TreeModel::Path& path, Gtk::SelectionData& selection_data) const
 {
 	if(!const_cast<LayerTreeStore*>(this)->get_iter(path)) return false;
 	//synfig::info("Dragged data of type \"%s\"",selection_data.get_data_type());
@@ -492,7 +490,7 @@ LayerTreeStore::drag_data_get_vfunc(const TreeModel::Path& path, Gtk::SelectionD
 	{
 		Layer* layer = (RecordType)row[model.record_type] == RECORD_TYPE_LAYER
 				     ? ((Layer::Handle)row[model.layer]).get()
-		             : NULL;
+		             : nullptr;
 		bool included(false);
 
 		std::vector<Layer*> layers;
@@ -528,7 +526,7 @@ LayerTreeStore::drag_data_delete_vfunc (const TreeModel::Path& /*path*/)
 }
 
 bool
-LayerTreeStore::row_drop_possible_vfunc (const TreeModel::Path& dest, const Gtk::SelectionData& selection_data)const
+LayerTreeStore::row_drop_possible_vfunc (const TreeModel::Path& dest, const Gtk::SelectionData& selection_data) const
 {
 	//synfig::info("possible_drop -- data of type \"%s\"",selection_data.get_data_type().c_str());
 	//synfig::info("possible_drop -- data of target \"%s\"",selection_data.get_target().c_str());
@@ -742,11 +740,11 @@ LayerTreeStore::rebuild()
 
 	// disconnect any subcanvas_changed connections
 	std::map<synfig::Layer::Handle, sigc::connection>::iterator iter;
-	for (iter = subcanvas_changed_connections.begin(); iter != subcanvas_changed_connections.end(); iter++)
+	for (iter = subcanvas_changed_connections.begin(); iter != subcanvas_changed_connections.end(); ++iter)
 		iter->second.disconnect();
 	subcanvas_changed_connections.clear();
 
-	for (iter = switch_changed_connections.begin(); iter != switch_changed_connections.end(); iter++)
+	for (iter = switch_changed_connections.begin(); iter != switch_changed_connections.end(); ++iter)
 		iter->second.disconnect();
 	switch_changed_connections.clear();
 
@@ -838,14 +836,16 @@ LayerTreeStore::refresh_row(Gtk::TreeModel::Row &row)
 void
 LayerTreeStore::set_row_layer(Gtk::TreeRow &row, const synfig::Layer::Handle &handle)
 {
-	if (etl::handle<Layer_PasteCanvas> layer_paste = etl::handle<Layer_PasteCanvas>::cast_dynamic(handle))
+	if (Layer_PasteCanvas::Handle layer_paste = Layer_PasteCanvas::Handle::cast_dynamic(handle))
 	{
 		subcanvas_changed_connections[layer_paste].disconnect();
 		subcanvas_changed_connections[layer_paste] =
 			layer_paste->signal_subcanvas_changed().connect(
 				sigc::mem_fun(*this,&studio::LayerTreeStore::queue_rebuild) );
 	}
-	if (etl::handle<Layer_Switch> layer_switch = etl::handle<Layer_Switch>::cast_dynamic(handle))
+
+	etl::handle<Layer_Switch> layer_switch = etl::handle<Layer_Switch>::cast_dynamic(handle);
+	if (layer_switch)
 	{
 		switch_changed_connections[layer_switch].disconnect();
 		switch_changed_connections[layer_switch] =
@@ -872,10 +872,12 @@ LayerTreeStore::set_row_layer(Gtk::TreeRow &row, const synfig::Layer::Handle &ha
 	//row[model.canvas] = handle->get_canvas();
 	//row[model.icon] = layer_icon;
 
-	synfig::Layer::Vocab vocab=handle->get_param_vocab();
-	synfig::Layer::Vocab::iterator iter;
+	// Does this layer have a parameter of canvas type?
+	// List this canvas layers as this layer children
 
-	for(iter=vocab.begin();iter!=vocab.end();++iter)
+	const synfig::Layer::Vocab vocab=handle->get_param_vocab();
+
+	for(auto iter=vocab.begin();iter!=vocab.end();++iter)
 	{
 		if(iter->get_hidden())
 			continue;
@@ -892,13 +894,10 @@ LayerTreeStore::set_row_layer(Gtk::TreeRow &row, const synfig::Layer::Handle &ha
 
 			std::set<String> possible_new_layers;
 			std::set<String> impossible_existant_layers;
-			if (etl::handle<Layer_Switch> layer_switch = etl::handle<Layer_Switch>::cast_dynamic(handle))
+			if (layer_switch)
 			{
-				if (!layer_switch->get_param("layer_name").get(String()).empty())
-				{
-					layer_switch->get_possible_new_layers(possible_new_layers);
-					layer_switch->get_impossible_existant_layers(impossible_existant_layers);
-				}
+				layer_switch->get_possible_new_layers(possible_new_layers);
+				layer_switch->get_impossible_existant_layers(impossible_existant_layers);
 			}
 
 			int index = canvas->size() + possible_new_layers.size();
@@ -920,7 +919,7 @@ LayerTreeStore::set_row_layer(Gtk::TreeRow &row, const synfig::Layer::Handle &ha
 		}
 
 		/*
-		etl::handle<ValueNode> value_node;
+		ValueNode::Handle value_node;
 		if(handle.constant()->dynamic_param_list().count(iter->get_name()))
 			value_node=handle->dynamic_param_list()[iter->get_name()];
 
@@ -971,7 +970,7 @@ LayerTreeStore::on_layer_added(synfig::Layer::Handle layer)
 void
 LayerTreeStore::on_layer_removed(synfig::Layer::Handle handle)
 {
-	if (etl::handle<Layer_PasteCanvas>::cast_dynamic(handle))
+	if (Layer_PasteCanvas::Handle::cast_dynamic(handle))
 	{
 		subcanvas_changed_connections[handle].disconnect();
 		subcanvas_changed_connections.erase(handle);
@@ -1080,7 +1079,7 @@ LayerTreeStore::on_layer_lowered(synfig::Layer::Handle layer)
 		// Save the selection data
 		//synfigapp::SelectionManager::LayerList layer_list=canvas_interface()->get_selection_manager()->get_selected_layers();
 		iter2=iter;
-		iter2++;
+		++iter2;
 		if(!iter2 || RECORD_TYPE_LAYER != (*iter2)[model.record_type])
 		{
 			rebuild();
@@ -1116,7 +1115,7 @@ LayerTreeStore::on_layer_raised(synfig::Layer::Handle layer)
 			synfig::Layer::Handle layer2=row2[model.layer];
 
 			erase(iter2);
-			iter++;
+			++iter;
 			row2=*insert(iter);
 			set_row_layer(row2,layer2);
 

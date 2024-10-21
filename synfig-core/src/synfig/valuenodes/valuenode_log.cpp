@@ -50,7 +50,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Logarithm, RELEASE_VERSION_0_61_09, "logarithm", "Logarithm")
+REGISTER_VALUENODE(ValueNode_Logarithm, RELEASE_VERSION_0_61_09, "logarithm", N_("Logarithm"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -59,8 +59,7 @@ REGISTER_VALUENODE(ValueNode_Logarithm, RELEASE_VERSION_0_61_09, "logarithm", "L
 ValueNode_Logarithm::ValueNode_Logarithm(const ValueBase &x):
 	LinkableValueNode(x.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	Real value(x.get(Real()));
 	Real infinity(999999.0);
 	Real epsilon(0.000001);
@@ -118,8 +117,8 @@ ValueNode_Logarithm::get_link_vfunc(int i)const
 ValueBase
 ValueNode_Logarithm::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	Real link     = (*link_)    (t).get(Real());
 	Real epsilon  = (*epsilon_) (t).get(Real());
@@ -150,17 +149,17 @@ ValueNode_Logarithm::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"link")
+	ret.push_back(ParamDesc("link")
 		.set_local_name(_("Link"))
 		.set_description(_("Value node used to calculate the Neperian logarithm"))
 	);
 
-		ret.push_back(ParamDesc(ValueBase(),"epsilon")
+		ret.push_back(ParamDesc("epsilon")
 		.set_local_name(_("Epsilon"))
 		.set_description(_("Value used to compare 'Link' with zero "))
 	);
 
-		ret.push_back(ParamDesc(ValueBase(),"infinite")
+		ret.push_back(ParamDesc("infinite")
 		.set_local_name(_("Infinite"))
 		.set_description(_("Returned value when result tends to infinite"))
 	);

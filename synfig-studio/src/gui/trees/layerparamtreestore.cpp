@@ -52,7 +52,6 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 using namespace studio;
 
@@ -108,8 +107,8 @@ LayerParamTreeStore::~LayerParamTreeStore()
 		changed_connection_list.pop_back();
 	}
 
-	if (getenv("SYNFIG_DEBUG_DESTRUCTORS"))
-		synfig::info("LayerParamTreeStore::~LayerParamTreeStore(): Deleted");
+	DEBUG_LOG("SYNFIG_DEBUG_DESTRUCTORS",
+		"LayerParamTreeStore::~LayerParamTreeStore(): Deleted");
 }
 
 Glib::RefPtr<LayerParamTreeStore>
@@ -241,9 +240,7 @@ LayerParamTreeStore::set_value_impl(const Gtk::TreeModel::iterator& iter, int co
 				LayerList mylist(layer_list);
 				LayerList::iterator iter2(mylist.begin());
 
-				//for(;iter2!=layer_list.end();++iter2)
-				for(;iter2!=mylist.end();iter2++)
-				{
+				for ( ; iter2 != mylist.end(); ++iter2) {
 					if(!canvas_interface()->change_value(synfigapp::ValueDesc(*iter2,param_desc.get_name()),x.get()))
 					{
 						// ERROR!
@@ -348,7 +345,7 @@ LayerParamTreeStore::rebuild()
 			ParamVocab x = layer_n->get_param_vocab();
 			ParamVocab::iterator iter;
 
-			for(iter=vocab.begin();iter!=vocab.end();++iter)
+			for (iter = vocab.begin(); iter != vocab.end(); ++iter)
 			{
 				String name(iter->get_name());
 				ParamVocab::iterator iter2(find_param_desc(x,name));
@@ -358,7 +355,7 @@ LayerParamTreeStore::rebuild()
 					// remove it and start over
 					vocab.erase(iter);
 					iter=vocab.begin();
-					iter--;
+					--iter;
 					continue;
 				}
 			}
@@ -520,7 +517,7 @@ LayerParamTreeStore::refresh_row(Gtk::TreeModel::Row &row)
 		}
 	}
 
-	//handle<ValueNode> value_node=row[model.value_node];
+	//ValueNode::Handle value_node=row[model.value_node];
 	//if(value_node)
 	{
 		CanvasTreeStore::refresh_row(row);
@@ -598,7 +595,26 @@ LayerParamTreeStore::on_value_node_replaced(synfig::ValueNode::Handle /*replaced
 	// failing as a result.  not sure how the tree code has a pointer
 	// rather than a handle - maybe it has a loosehandle, that would
 	// cause the problem I was seeing
-	rebuild();
+
+	// Maybe the comment above is deprecated. -^
+	// It seems we don't need to use the old solution (call queue_refresh()),
+	// neither the previous solution (rebuild(), commented out below).
+	// When a value node is replaced (via RHandle::replace()), it
+	// already calls Node::signal_changed() so the row is refreshed
+	// by other signal slot.
+	//
+	// Calling rebuild() causes two bugs:
+	// 1. Parameters panel collapses items on edit (GH#386), when we
+	//    we have Animation Mode enabled and are editing parameter that
+	//    wasn't previously animated.
+	//    'Solution' seems to be to call queue_refresh()
+	// 2. Crash (or emit Gtk warning) when we animate a parameter (like
+	//    previous case) that uses a combobox for editing (GH#2390), as
+	//    Active Layer Name of Switch Layer or Bone Parent in Bones list
+	//    of Skeleton Layer.
+	//    'Solution' seems to be to call queue_rebuild()
+
+	refresh();
 }
 
 void

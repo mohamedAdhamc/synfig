@@ -60,6 +60,18 @@ using namespace studio;
 
 /* === P R O C E D U R E S ================================================= */
 
+static Gtk::Image*
+create_image_from_icon(const std::string& icon_name, Gtk::IconSize icon_size)
+{
+#if GTK_CHECK_VERSION(3,24,0)
+	return new Gtk::Image(icon_name, icon_size);
+#else
+	Gtk::Image* image = new Gtk::Image();
+	image->set_from_icon_name(icon_name, icon_size);
+	return image;
+#endif
+}
+
 /* === M E T H O D S ======================================================= */
 
 DockBook::DockBook():
@@ -97,7 +109,7 @@ DockBook::clear()
 	// i didn't know why this happens, possibly because clear() is called from destructor
 	// and 'this' is already deleted. Or, this function maybe never work right.
 	// So here quick-hack again. Btw, as you can see from commented code later newly created 
-	// dockbook is works fine, so this situation is reqired more detailed investigation.
+	// dockbook is works fine, so this situation is required more detailed investigation.
 	if (!GTK_IS_NOTEBOOK (this)) return; // because we always fail if 'this' is not notebook
 
 	/*Gtk::Notebook note;
@@ -286,7 +298,9 @@ DockBook::tab_button_pressed(GdkEventButton* event, Dockable* dockable)
 		tabmenu->append(*item);
 	}
 
-	Gtk::MenuItem *item = manage(new Gtk::ImageMenuItem(Gtk::StockID("gtk-close")));
+	Gtk::MenuItem *item = manage(new Gtk::ImageMenuItem(
+		*Gtk::manage(create_image_from_icon("window-close", Gtk::ICON_SIZE_MENU)),
+		_("Close")));
 	item->signal_activate().connect(
 		sigc::bind(sigc::ptr_fun(&DockManager::remove_widget_by_pointer_recursive), dockable) );
 	item->show();
@@ -301,7 +315,7 @@ DockBook::tab_button_pressed(GdkEventButton* event, Dockable* dockable)
 void
 DockBook::on_switch_page(Gtk::Widget* page, guint page_num)
 {
-	if (page != NULL && this->page_num(*page)) {
+	if (page && this->page_num(*page) != -1) {
 		CanvasView *canvas_view = dynamic_cast<CanvasView*>(page);
 		if (canvas_view && canvas_view != App::get_selected_canvas_view())
 			App::set_selected_canvas_view(canvas_view);

@@ -67,6 +67,7 @@
 #include <synfig/general.h>
 #include <synfig/layers/layer_switch.h>
 #include <synfig/savecanvas.h>
+#include <synfig/synfig_iterations.h>
 #include <synfig/valuenode_registry.h>
 #include <synfig/valuenodes/valuenode_composite.h>
 #include <synfig/valuenodes/valuenode_duplicate.h>
@@ -79,10 +80,8 @@
 
 #endif
 
-using namespace etl;
 using namespace synfig;
 using namespace studio;
-using namespace sigc;
 
 /* === M A C R O S ========================================================= */
 
@@ -91,6 +90,107 @@ using namespace sigc;
 int studio::Instance::instance_count_=0;
 
 /* === P R O C E D U R E S ================================================= */
+
+static Gtk::Image*
+create_image_from_icon(const std::string& icon_name, Gtk::IconSize icon_size)
+{
+	if (icon_name == "image-missing")
+		return new Gtk::Image();
+
+#if GTK_CHECK_VERSION(3,24,0)
+	return new Gtk::Image(icon_name, icon_size);
+#else
+	Gtk::Image* image = new Gtk::Image();
+	image->set_from_icon_name(icon_name, icon_size);
+	return image;
+#endif
+}
+
+static void get_layer_path(const Layer::Handle& l, const Canvas::LooseHandle root_canvas, std::string& path);
+
+struct ValueNodePathBuilder {
+
+	const Canvas::LooseHandle& canvas;
+	std::string path;
+	std::string link_name;
+
+	synfig::TraverseCallbackAction
+	operator() (ValueNode::Handle vn)
+	{
+		if (vn->get_type() != type_canvas)
+			return TRAVERSE_CALLBACK_SKIP;
+
+		if ((*vn)(canvas->get_time()).get(Canvas::Handle()) != canvas)
+			return TRAVERSE_CALLBACK_SKIP;
+
+		if (!link_name.empty())
+			path += "/" + link_name;
+
+		if (const auto constvn = ValueNode_Const::Handle::cast_dynamic(vn))
+			return TRAVERSE_CALLBACK_ABORT;
+
+		if (const auto linkable = LinkableValueNode::Handle::cast_dynamic(vn)) {
+			path += "/" + linkable->get_name();
+			for (int i=0; i < linkable->link_count(); i++) {
+				auto ith_link = linkable->get_link(i);
+				ValueNodePathBuilder builder {canvas};
+				builder.link_name = linkable->link_name(i);
+				traverse_valuenodes(ith_link, [&builder](ValueNode::Handle vn) -> synfig::TraverseCallbackAction {
+					auto action = builder(vn);
+					return action;
+				});
+				if (!builder.path.empty()) {
+					path += builder.path;
+					break;
+				}
+			}
+			return TRAVERSE_CALLBACK_ABORT; // hacked RECURSIVE above;
+		}
+		return TRAVERSE_CALLBACK_ABORT;
+	}
+};
+
+static void
+get_canvas_path(Canvas::LooseHandle canvas, const Canvas::LooseHandle root_canvas, std::string& path)
+{
+	if (canvas->is_inline()) {
+		if (auto layer = canvas->find_first_parent_of_type<Layer>()) {
+			for (const auto& param_item : layer->get_param_list()) {
+				if (param_item.second.get_type() == type_canvas) {
+					if (param_item.second.get(Canvas::LooseHandle()) == canvas) {
+						std::string dynamic_str;
+						auto dynamic_param_iter = layer->dynamic_param_list().find(param_item.first);
+						if (dynamic_param_iter != layer->dynamic_param_list().end()) {
+							ValueNodePathBuilder vn_path_builder {canvas};
+							traverse_valuenodes(dynamic_param_iter->second, [&vn_path_builder](ValueNode::Handle vn) -> TraverseCallbackAction {
+								return vn_path_builder(vn);
+							});
+							dynamic_str = vn_path_builder.path;
+						}
+						path = strprintf("/param[@name='%s']%s/canvas%s", param_item.first.c_str(), dynamic_str.c_str(), path.c_str());
+					}
+				}
+			}
+			get_layer_path(layer, root_canvas, path);
+		}
+	} else {
+		path = canvas->get_relative_id(root_canvas) + path;
+	}
+}
+
+static void
+get_layer_path(const Layer::Handle& l, const Canvas::LooseHandle root_canvas, std::string& path)
+{
+	if (l) {
+		auto canvas = l->get_canvas();
+		if (!canvas) {
+			warning("layer without canvas!");
+		} else {
+			path = strprintf("/layer[%i]", canvas->size() - canvas->get_depth(l)) + path;
+			get_canvas_path(canvas, root_canvas, path);
+		}
+	}
+}
 
 /* === M E T H O D S ======================================================= */
 
@@ -119,11 +219,11 @@ Instance::~Instance()
 }
 
 // this function returns true if the given extension belongs to image layer type
-bool Instance::is_img(synfig::String ext) const
+static bool
+is_img(const synfig::String& filename)
 {
-		std::set <String> img_ext{".jpg",".jpeg",".png",".bmp",".gif"};
-		bool is_in = img_ext.find(ext) != img_ext.end();
-		return is_in;
+	static const std::set<String> img_ext{".jpg",".jpeg",".png",".bmp",".gif",".tiff",".tif",".dib",".ppm",".pbm",".pgm",".pnm",".webp"};
+	return img_ext.find(Glib::ustring(filesystem::Path::filename_extension(filename)).lowercase()) != img_ext.end();
 }
 
 synfig::Layer::Handle
@@ -131,15 +231,19 @@ Instance::layer_inside_switch(synfig::Layer_Switch::Handle paste) const
 {
 	synfig::Layer::Handle child_layer;
 	synfig::Canvas::Handle canvas = paste->get_sub_canvas();
-	synfig::String active_layer = "";
-	active_layer = paste->get_param("layer_name").get(synfig::String());
 	if(canvas)
 	{
-		for(IndependentContext i = canvas->get_independent_context(); *i; i++)
-		{
-			if((*i)->get_description()==active_layer)
-			{
-				child_layer = (*i);
+		synfig::String active_layer = paste->get_param("layer_name").get(synfig::String());
+
+		if (active_layer.empty()) {
+			int active_layer_index = paste->get_param("layer_depth").get(int());
+			auto layer_iter = canvas->byindex(active_layer_index);
+			if (layer_iter != canvas->end())
+				child_layer = *layer_iter;
+		} else {
+			for (IndependentContext i = canvas->get_independent_context(); *i; i++) {
+				if((*i)->get_description()==active_layer)
+					child_layer = (*i);
 			}
 		}
 	}
@@ -158,11 +262,11 @@ Instance::get_visible_canvases()const
 	return count;
 }
 
-handle<Instance>
+etl::handle<Instance>
 Instance::create(synfig::Canvas::Handle canvas, synfig::FileSystem::Handle container)
 {
 	// Construct a new instance
-	handle<Instance> instance(new Instance(canvas, container));
+	etl::handle<Instance> instance(new Instance(canvas, container));
 
 	// Set the user preference regarding redo-history behavior
 	{
@@ -188,8 +292,8 @@ Instance::create(synfig::Canvas::Handle canvas, synfig::FileSystem::Handle conta
 	return instance;
 }
 
-handle<CanvasView>
-Instance::find_canvas_view(etl::handle<synfig::Canvas> canvas)
+CanvasView::Handle
+Instance::find_canvas_view(Canvas::Handle canvas)
 {
 	if(!canvas)
 		return 0;
@@ -199,7 +303,7 @@ Instance::find_canvas_view(etl::handle<synfig::Canvas> canvas)
 
 	CanvasViewList::iterator iter;
 
-	for(iter=canvas_view_list().begin();iter!=canvas_view_list().end();iter++)
+	for (iter = canvas_view_list().begin(); iter != canvas_view_list().end(); ++iter)
 		if((*iter)->get_canvas()==canvas)
 			return *iter;
 
@@ -207,9 +311,9 @@ Instance::find_canvas_view(etl::handle<synfig::Canvas> canvas)
 }
 
 void
-Instance::focus(etl::handle<synfig::Canvas> canvas)
+Instance::focus(Canvas::Handle canvas)
 {
-	handle<CanvasView> canvas_view=find_canvas_view(canvas);
+	CanvasView::Handle canvas_view = find_canvas_view(canvas);
 	assert(canvas_view);
 	canvas_view->present();
 }
@@ -233,7 +337,44 @@ Instance::set_redo_status(bool x)
 void
 studio::Instance::run_plugin(std::string plugin_id, bool modify_canvas, std::vector<std::string> extra_args)
 {
-	handle<synfigapp::UIInterface> uim = this->find_canvas_view(this->get_canvas())->get_ui_interface();
+	etl::handle<synfigapp::UIInterface> uim = this->find_canvas_view(this->get_canvas())->get_ui_interface();
+
+	std::unordered_map<std::string,std::string> view_state;
+
+	const auto required_args = App::plugin_manager.get_script_args(plugin_id);
+
+	if (auto canvas_interface = find_canvas_interface(get_canvas())) {
+
+		// Current Time
+
+		view_state["current_time"] = canvas_interface->get_time().get_string(synfig::Time::FORMAT_VIDEO);
+
+		// Selected Layers
+
+		if (auto selection = canvas_interface->get_selection_manager()) {
+
+			// Layers
+			if (required_args.selected_layers != PluginScript::ArgNecessity::ARGUMENT_UNUSED) {
+				for (const auto& layer : selection->get_selected_layers()) {
+					std::string xpath;
+					get_layer_path(layer, get_canvas(), xpath);
+					auto& selected_layers = view_state["selected_layers"];
+					if (!selected_layers.empty())
+						selected_layers.append(",");
+					selected_layers += '"' + JSON::escape_string(xpath) + '"';
+				}
+			}
+		}
+	}
+
+	if (required_args.selected_layers == PluginScript::ArgNecessity::ARGUMENT_MANDATORY && view_state.count("selected_layers") == 0) {
+		App::dialog_message_1b(
+				"ERROR",
+				_("The plugin operation has failed."),
+				_("This plugin requires layer(s) to be selected.\nSelect one or more layers and re-run the plugin."),
+				_("Close"));
+		return;
+	}
 
 	if ( modify_canvas )
 	{
@@ -259,28 +400,30 @@ studio::Instance::run_plugin(std::string plugin_id, bool modify_canvas, std::vec
 
 	backup(true);
 	FileSystemTemporary::Handle temporary_filesystem = FileSystemTemporary::Handle::cast_dynamic(get_canvas()->get_file_system());
-	String tmp_filename = temporary_filesystem->get_temporary_directory() + ETL_DIRECTORY_SEPARATOR + temporary_filesystem->get_temporary_filename_base();
+	filesystem::Path tmp_filename = temporary_filesystem->get_temporary_directory() / temporary_filesystem->get_temporary_filename_base();
 
 	Time cur_time;
 	cur_time = canvas->get_time();
 
 	// Generate temporary file name
-	String filename_original = get_canvas()->get_file_name();
-	String filename_processed;
-	String filename_prefix;
-	if ( !is_absolute_path(filename_original) )
-		filename_prefix = temporary_filesystem->get_temporary_directory() + ETL_DIRECTORY_SEPARATOR;
-	struct stat buf;
-	do {
-		synfig::GUID guid;
-		filename_processed = filename_prefix + filename_original + "." + guid.get_string().substr(0,8) + ".sif";
-	} while (stat(filename_processed.c_str(), &buf) != -1);
+	filesystem::Path canvas_file = filesystem::Path(get_canvas()->get_file_name());
+	filesystem::Path filename_dir = canvas_file.parent_path();
+	if (!filename_dir.is_absolute())
+		filename_dir = temporary_filesystem->get_temporary_directory();
+
+	auto temp_lock = FileSystemTemporary::reserve_temporary_filename(filename_dir, canvas_file.filename().u8string(), ".sif");
+	if (!temp_lock.second) {
+		App::dialog_message_1b("ERROR", _("The plugin operation has failed."), _("Couldn't create a temporary file"), _("Close"));
+		return;
+	}
+
+	filesystem::Path filename_processed = temp_lock.first;
+
 
 	if ( modify_canvas )
 		close(false);
 
-	if(canvas->count() != 1 && modify_canvas)
-	{
+	if (canvas->use_count() != 1 && modify_canvas) {
 		one_moment.hide();
 		App::dialog_message_1b(
 				"ERROR",
@@ -295,14 +438,14 @@ studio::Instance::run_plugin(std::string plugin_id, bool modify_canvas, std::vec
 	} else {
 
 		// Save file copy
-		String filename_ext = filename_extension(filename_original);
+		String filename_ext = canvas_file.extension().u8string();
 		if ( filename_ext.empty() || ( filename_ext != ".sif" && filename_ext != ".sifz") )
 			filename_ext = ".sifz";
 		FileSystem::ReadStream::Handle stream_in = temporary_filesystem->get_read_stream("#project"+filename_ext);
 		if (!stream_in)
 		{
 			synfig::error(strprintf("run_plugin(): Unable to open file for reading - %s", temporary_filesystem->get_real_uri("#project"+filename_ext).c_str()));
-			FileSystemTemporary::Identifier identifier(temporary_filesystem, filename_processed);
+			FileSystemTemporary::Identifier identifier(temporary_filesystem, filename_processed.u8string());
 			if ( !save_canvas(identifier, get_canvas(), true) )
 			{
 				App::dialog_message_1b(
@@ -319,7 +462,7 @@ studio::Instance::run_plugin(std::string plugin_id, bool modify_canvas, std::vec
 			if (filename_ext == ".sifz")
 				stream_in = new ZReadStream(stream_in, synfig::zstreambuf::gzip);
 
-			FileSystem::WriteStream::Handle outfile = FileSystemNative::instance()->get_write_stream(filename_processed);
+			FileSystem::WriteStream::Handle outfile = FileSystemNative::instance()->get_write_stream(filename_processed.u8string());
 			*outfile << stream_in->rdbuf();
 			outfile.reset();
 
@@ -327,8 +470,9 @@ studio::Instance::run_plugin(std::string plugin_id, bool modify_canvas, std::vec
 		}
 
 		one_moment.hide();
-		extra_args.insert(extra_args.begin(), filename_processed);
-		bool result = App::plugin_manager.run(plugin_id, extra_args);
+		extra_args.insert(extra_args.begin(), filename_processed.u8string());
+
+		bool result = App::plugin_manager.run(plugin_id, extra_args, view_state);
 
 		if (result && modify_canvas){
 			// Restore file copy
@@ -340,13 +484,13 @@ studio::Instance::run_plugin(std::string plugin_id, bool modify_canvas, std::vec
 			{
 				synfig::error("run_plugin(): Unable to open file for write");
 			} else {
-				FileSystem::ReadStream::Handle infile = FileSystemNative::instance()->get_read_stream(filename_processed);
+				FileSystem::ReadStream::Handle infile = FileSystemNative::instance()->get_read_stream(filename_processed.u8string());
 				*stream << infile->rdbuf();
 				infile.reset();
 				stream.reset();
 			}
 		}
-		FileSystemNative::instance()->file_remove(filename_processed);
+		FileSystemNative::instance()->file_remove(filename_processed.u8string());
 	}
 
 	canvas=0;
@@ -382,8 +526,8 @@ studio::Instance::save_as(const synfig::String &file_name)
 	if(synfigapp::Instance::save_as(file_name))
 	{
 		// after changing the filename, update the render settings with the new filename
-		for (std::list<handle<CanvasView> >::iterator iter = canvas_view_list().begin(); iter!=canvas_view_list().end(); iter++)
-			(*iter)->render_settings.set_entry_filename();
+		for (const auto& canvas_view : canvas_view_list())
+			canvas_view->render_settings.set_entry_filename();
 		App::add_recent_file(etl::handle<Instance>(this));
 
 		// check for unsaved layers (external bitmaps, etc)
@@ -457,16 +601,15 @@ studio::Instance::has_real_filename()
 bool
 studio::Instance::dialog_save_as()
 {
-	std::string filename = get_file_name();
+	filesystem::Path filename = get_file_name();
 	Canvas::Handle canvas(get_canvas());
 
 	{
 		OneMoment one_moment;
-		std::set<Node*>::iterator iter;
-		for(iter=canvas->parent_set.begin();iter!=canvas->parent_set.end();++iter)
+		bool problematic = false;
+		canvas->foreach_parent([=, &problematic](Node* node)
 		{
-			synfig::Node* node(*iter);
-			for(;!node->parent_set.empty();node=*node->parent_set.begin())
+			for(;node->parent_count();node=node->get_first_parent())
 			{
 				Layer::Handle parent_layer(dynamic_cast<Layer*>(node));
 				if(parent_layer && parent_layer->get_canvas()->get_root()!=get_canvas())
@@ -482,16 +625,20 @@ studio::Instance::dialog_save_as()
 							"details",
 							_("Close"));
 
-					return false;
+					problematic = true;
+					return true;
 				}
 				if(parent_layer)
 					break;
 			}
-		}
+			return false;
+		});
+		if (problematic)
+			return false;
 	}
 
 	if (has_real_filename())
-		filename = absolute_path(filename);
+		filename = filesystem::absolute(filename);
 
 	// show the canvas' name if it has one, else its ID
 	while (App::dialog_save_file((_("Please choose a file name") +
@@ -502,19 +649,19 @@ studio::Instance::dialog_save_as()
 	{
 		// If the filename still has wildcards, then we should
 		// continue looking for the file we want
-		std::string base_filename = basename(filename);
-		if (find(base_filename.begin(),base_filename.end(),'*')!=base_filename.end())
+		std::string base_filename = filename.filename().u8string();
+		if (base_filename.find('*') != std::string::npos)
 			continue;
 
 		// if file extension is not recognized, then forced to .sifz
-		if (filename_extension(filename) == "")
-			filename+=".sifz";
+		if (filename.extension().empty())
+			filename.concat(".sifz");
 
 		canvas->set_name(base_filename);
 		// forced to .sifz, the below code is not need anymore
 		try
 		{
-			String ext(filename_extension(filename));
+			String ext(filename.extension().u8string());
 			// todo: ".sfg" literal and others
 			if (ext != ".sif" && ext != ".sifz" && ext != ".sfg" && !App::dialog_message_2b(
 				_("Unknown extension"),
@@ -531,55 +678,34 @@ studio::Instance::dialog_save_as()
 			continue;
 		}
 
-		{
-			struct stat	s;
-			int stat_return = stat(filename.c_str(), &s);
-
-			// if stat() fails with something other than 'file doesn't exist', there's been a real
-			// error of some kind.  let's give up now and ask for a new path.
-			if (stat_return == -1 && errno != ENOENT)
-			{
-				perror(filename.c_str());
-				std::string msg(strprintf(_("Unable to check whether '%s' exists."), filename.c_str()));
-				App::dialog_message_1b(
-						"ERROR",
-						msg.c_str(),
-						"details",
-						_("Close"));
-
+		bool file_exists = FileSystemNative::instance()->is_file(filename.u8string());
+		if (!file_exists) {
+			if (FileSystemNative::instance()->is_exists(filename.u8string())) {
+				std::string msg(strprintf(_("There is a folder with the same name '%s'.\nPlease choose another name"), filename.u8_str()));
+				App::dialog_message_1b("ERROR", msg.c_str(), "details", _("Close"));
 				continue;
 			}
-
+		} else {
 			// If the file exists and the user doesn't want to overwrite it, keep prompting for a filename
 			std::string message = strprintf(_("A file named \"%s\" already exists. "
 							"Do you want to replace it?"),
-							basename(filename).c_str());
+							filename.filename().u8_str());
 
 			std::string details = strprintf(_("The file already exists in \"%s\". "
 							"Replacing it will overwrite its contents."),
-							dirname(filename).c_str());
+							filename.parent_path().u8_str());
 
-			if ((stat_return == 0) && !App::dialog_message_2b(
-				message,
-				details,
-				Gtk::MESSAGE_QUESTION,
-				_("Use Another Name…"),
-				_("Replace"))
-			)
+			if (!App::dialog_message_2b(message, details, Gtk::MESSAGE_QUESTION, _("Use Another Name…"), _("Replace")))
 				continue;
 		}
 
-		if(save_as(filename))
+		if (save_as(filename.u8string()))
 		{
-			synfig::set_file_version(ReleaseVersion(RELEASE_VERSION_END-1));
+			synfig::set_file_version(synfig::RELEASE_VERSION_CURRENT);
 			return true;
 		}
-		std::string msg(strprintf(_("Unable to save to '%s'"), filename.c_str()));
-		App::dialog_message_1b(
-				"ERROR",
-				msg.c_str(),
-				"details",
-				_("Close"));
+		std::string msg(strprintf(_("Unable to save to '%s'"), filename.u8_str()));
+		App::dialog_message_1b("ERROR", msg.c_str(), "details", _("Close"));
 	}
 
 	return false;
@@ -589,11 +715,11 @@ studio::Instance::dialog_save_as()
 bool
 studio::Instance::dialog_export()
 {
-	std::string filename = get_file_name();
+	filesystem::Path filename = get_file_name();
 	Canvas::Handle canvas(get_canvas());
 
 	if (has_real_filename())
-		filename = absolute_path(filename);
+		filename = filesystem::absolute(filename);
 
 	// show the canvas' name if it has one, else its ID
 	std::string plugin_id = App::dialog_export_file(
@@ -605,7 +731,7 @@ studio::Instance::dialog_export()
 	);
 	if ( !plugin_id.empty() )
 	{
-		run_plugin(plugin_id, false, {filename});
+		run_plugin(plugin_id, false, {filename.u8string()});
 		return true;
 	}
 
@@ -615,9 +741,8 @@ studio::Instance::dialog_export()
 void
 Instance::update_all_titles()
 {
-	std::list<handle<CanvasView> >::iterator iter;
-	for(iter=canvas_view_list().begin();iter!=canvas_view_list().end();iter++)
-		(*iter)->update_title();
+	for (const auto& canvas_view : canvas_view_list())
+		canvas_view->update_title();
 }
 
 void
@@ -625,7 +750,7 @@ Instance::close(bool remove_temporary_files)
 {
 	// This will increase the reference count so we don't get DELETED
 	// until we are ready
-	handle<Instance> me(this);
+	etl::handle<Instance> me(this);
 
 	/*
 	We need to hide some panels when instance is closed.
@@ -633,7 +758,7 @@ Instance::close(bool remove_temporary_files)
 	 1) the list is scrolled down
 	 2) user closes file
 	*/
-	handle<CanvasView> canvas_view=find_canvas_view(get_canvas());
+	CanvasView::Handle canvas_view = find_canvas_view(get_canvas());
 	Gtk::Widget* tree_view_keyframes = canvas_view->get_ext_widget("keyframes");
 	tree_view_keyframes->hide();
 
@@ -649,7 +774,7 @@ Instance::close(bool remove_temporary_files)
 
 	// Remove us from the active instance list
 	std::list<etl::handle<studio::Instance> >::iterator iter;
-	for(iter=studio::App::instance_list.begin();iter!=studio::App::instance_list.end();iter++)
+	for (iter = studio::App::instance_list.begin(); iter != studio::App::instance_list.end(); ++iter)
 		if(*iter==this)
 			break;
 	assert(iter!=studio::App::instance_list.end());
@@ -660,8 +785,8 @@ Instance::close(bool remove_temporary_files)
 	studio::App::signal_instance_deleted()(this);
 
 	// Hide all of the canvas views
-	for(std::list<etl::handle<CanvasView> >::iterator iter=canvas_view_list().begin();iter!=canvas_view_list().end();iter++)
-		(*iter)->hide();
+	for (const auto& canvas_view : canvas_view_list())
+		canvas_view->hide();
 
 	// Consume pending events before deleting the canvas views
 	App::process_all_events();
@@ -693,11 +818,11 @@ Instance::insert_canvas(Gtk::TreeRow row, synfig::Canvas::Handle canvas)
 	CanvasTreeModel canvas_tree_model;
 	assert(canvas);
 
-	row[canvas_tree_model.icon] = Gtk::Button().render_icon_pixbuf(Gtk::StockID("synfig-canvas"),Gtk::ICON_SIZE_SMALL_TOOLBAR);
+	row[canvas_tree_model.icon_name] = "canvas_icon";
 	row[canvas_tree_model.id] = canvas->get_id();
 	row[canvas_tree_model.name] = canvas->get_name();
 	if(canvas->is_root())
-		row[canvas_tree_model.label] = basename(canvas->get_file_name());
+		row[canvas_tree_model.label] = filesystem::Path::basename(canvas->get_file_name());
 	else
 	if(!canvas->get_id().empty())
 		row[canvas_tree_model.label] = canvas->get_id();
@@ -715,7 +840,7 @@ Instance::insert_canvas(Gtk::TreeRow row, synfig::Canvas::Handle canvas)
 		synfig::Canvas::Children::iterator iter;
 		synfig::Canvas::Children &children(canvas->children());
 
-		for(iter=children.begin();iter!=children.end();iter++)
+		for (iter = children.begin(); iter != children.end(); ++iter)
 			insert_canvas(*(canvas_tree_store()->append(row.children())),*iter);
 	}
 }
@@ -733,14 +858,13 @@ Instance::revert()
 {
 	OneMoment one_moment;
 
-	String filename(get_file_name());
+	filesystem::Path filename(get_file_name());
 
 	Canvas::Handle canvas(get_canvas());
 
 	close();
 
-	if(canvas->count()!=1)
-	{
+	if (canvas->use_count() != 1) {
 		one_moment.hide();
 		App::dialog_message_1b(
 				"ERROR",
@@ -782,8 +906,8 @@ Instance::safe_revert()
 bool
 Instance::safe_close()
 {
-	handle<CanvasView> canvas_view = find_canvas_view(get_canvas());
-	handle<synfigapp::UIInterface> uim=canvas_view->get_ui_interface();
+	CanvasView::Handle canvas_view = find_canvas_view(get_canvas());
+	etl::handle<synfigapp::UIInterface> uim = canvas_view->get_ui_interface();
 
 	// if the animation is currently playing, closing the window will cause a crash,
 	// so don't allow it
@@ -802,7 +926,7 @@ Instance::safe_close()
 		do
 		{
 			std::string message = strprintf(_("Save changes to document \"%s\" before closing?"),
-					basename(get_file_name()).c_str() );
+					filesystem::Path::basename(get_file_name()).c_str() );
 
 			std::string details = (_("If you don't save, changes from the last time you saved "
 					"will be permanently lost."));
@@ -848,13 +972,13 @@ Instance::add_actions_to_group(const Glib::RefPtr<Gtk::ActionGroup>& action_grou
 
 	for(iter=candidate_list.begin();iter!=candidate_list.end();++iter)
 	{
-		Gtk::StockID stock_id(get_action_stock_id(*iter));
+		std::string icon_name(get_action_icon_name(*iter));
 
 		if(!(iter->category&synfigapp::Action::CATEGORY_HIDDEN))
 		{
-			action_group->add(Gtk::Action::create(
+			action_group->add(Gtk::Action::create_with_icon_name(
 				"action-"+iter->name,
-				stock_id,
+				icon_name,
 				iter->local_name,iter->local_name
 			),
 				sigc::bind(
@@ -905,8 +1029,9 @@ Instance::add_actions_to_menu(Gtk::Menu *menu, const synfigapp::Action::ParamLis
 				continue;
 
 			Gtk::MenuItem *item = Gtk::manage(new Gtk::ImageMenuItem(
-				*Gtk::manage(new Gtk::Image(get_action_stock_id(*iter),Gtk::ICON_SIZE_MENU)),
+				*Gtk::manage(create_image_from_icon(get_action_icon_name(*iter), Gtk::ICON_SIZE_MENU)),
 				iter->local_name ));
+
 			item->signal_activate().connect(
 				sigc::bind(
 					sigc::bind(
@@ -952,7 +1077,7 @@ Instance::add_actions_to_menu(Gtk::Menu *menu, const synfigapp::Action::ParamLis
 		if(!(iter->category&synfigapp::Action::CATEGORY_HIDDEN))
 		{
 			Gtk::MenuItem *item = Gtk::manage(new Gtk::ImageMenuItem(
-				*Gtk::manage(new Gtk::Image(get_action_stock_id(*iter),Gtk::ICON_SIZE_MENU)),
+				*Gtk::manage(create_image_from_icon(get_action_icon_name(*iter), Gtk::ICON_SIZE_MENU)),
 				iter->local_name ));
 			item->signal_activate().connect(
 				sigc::bind(
@@ -972,7 +1097,7 @@ Instance::add_actions_to_menu(Gtk::Menu *menu, const synfigapp::Action::ParamLis
 		if(!(iter->category&synfigapp::Action::CATEGORY_HIDDEN))
 		{
 			Gtk::MenuItem *item = Gtk::manage(new Gtk::ImageMenuItem(
-				*Gtk::manage(new Gtk::Image(get_action_stock_id(*iter),Gtk::ICON_SIZE_MENU)),
+				*Gtk::manage(create_image_from_icon(get_action_icon_name(*iter), Gtk::ICON_SIZE_MENU)),
 				iter->local_name ));
 			item->signal_activate().connect(
 				sigc::bind(
@@ -991,8 +1116,8 @@ Instance::add_actions_to_menu(Gtk::Menu *menu, const synfigapp::Action::ParamLis
 void
 Instance::process_action(synfig::String name, synfigapp::Action::ParamList param_list)
 {
-	if (getenv("SYNFIG_DEBUG_ACTIONS"))
-		synfig::info("%s:%d process_action: '%s'", __FILE__, __LINE__, name.c_str());
+	DEBUG_LOG("SYNFIG_DEBUG_ACTIONS",
+		"%s:%d process_action: '%s'", __FILE__, __LINE__, name.c_str());
 
 	assert(synfigapp::Action::book().count(name));
 
@@ -1092,11 +1217,11 @@ Instance::make_param_menu(Gtk::Menu *menu,synfig::Canvas::Handle canvas, synfiga
 	Gtk::Menu& parammenu(*menu);
 	synfigapp::ValueDesc value_desc2(value_desc);
 	etl::handle<synfigapp::CanvasInterface> canvas_interface(find_canvas_interface(canvas));
-	etl::handle<CanvasView> canvas_view(find_canvas_view(canvas));
+	CanvasView::Handle canvas_view(find_canvas_view(canvas));
 	if(!canvas_interface)
 		return;
 
-	Gtk::MenuItem *item = NULL;
+	Gtk::MenuItem* item = nullptr;
 
 	synfigapp::Action::ParamList param_list,param_list2;
 	param_list=canvas_interface->generate_param_list(value_desc);
@@ -1138,7 +1263,7 @@ Instance::make_param_menu(Gtk::Menu *menu,synfig::Canvas::Handle canvas, synfiga
 		{
 			if(iter->second.check_type(value_desc.get_value_type()))
 			{
-				item = Gtk::manage(new Gtk::MenuItem(iter->second.local_name));
+				item = Gtk::manage(new Gtk::MenuItem(iter->second.get_local_name()));
 				item->signal_activate().connect(
 					sigc::hide_return(
 						sigc::bind(
@@ -1152,9 +1277,7 @@ Instance::make_param_menu(Gtk::Menu *menu,synfig::Canvas::Handle canvas, synfiga
 		}
 
 		item = Gtk::manage(new Gtk::ImageMenuItem(
-			*manage(new Gtk::Image(
-				Gtk::StockID("gtk-convert"),
-				Gtk::ICON_SIZE_MENU )),
+			*Gtk::manage(create_image_from_icon("gtk-convert", Gtk::ICON_SIZE_MENU )),
 			_("Convert") ));
 		item->set_submenu(*convert_menu);
 		item->show();
@@ -1188,22 +1311,10 @@ Instance::make_param_menu(Gtk::Menu *menu,synfig::Canvas::Handle canvas, synfiga
 		param_interpolation_menu->append(*item);
 		param_list.erase("new_value");
 
-		Gtk::Image *image;
-
-#if GTK_CHECK_VERSION(3,24,0)
-	#define CREATE_IMAGE(ImageVar, IconName, IconSize) \
-		ImageVar = manage(new Gtk::Image(IconName, IconSize));
-#else
-	#define CREATE_IMAGE(ImageVar, IconName, IconSize) \
-		ImageVar = manage(new Gtk::Image()); \
-		ImageVar->set_from_icon_name(IconName, IconSize);
-#endif
-
 		#define ADD_IMAGE_MENU_ITEM(Interpolation, IconName, Text) \
 		param_list.add("new_value", Interpolation); \
-		CREATE_IMAGE(image, IconName, Gtk::IconSize::from_name("synfig-small_icon")); \
 		item = Gtk::manage(new Gtk::ImageMenuItem( \
-			*image, \
+			*Gtk::manage(create_image_from_icon(IconName, Gtk::IconSize::from_name("synfig-small_icon"))), \
 			_(Text) )); \
 		item->signal_activate().connect( \
 			sigc::bind( \
@@ -1243,7 +1354,9 @@ Instance::make_param_menu(Gtk::Menu *menu,synfig::Canvas::Handle canvas, synfiga
 			param_list.add("selected_value_desc",selected_value_desc);
 	}
 
-	param_list.add("child",canvas_view->get_work_area()->get_active_bone_value_node());
+	if (std::string("bone") == canvas_view->get_smach().get_state_name()) {
+		param_list.add("active_bone", canvas_view->get_work_area()->get_active_bone_value_node());
+	}
 
 	if(param_list2.empty())
 		add_actions_to_menu(&parammenu, param_list,categories);
@@ -1299,10 +1412,10 @@ Instance::make_param_menu(Gtk::Menu *menu,synfig::Canvas::Handle canvas, synfiga
 		parammenu.append(*item);
 
 
-		#define ADD_IMAGE_MENU_ITEM(Type, StockId, Text) \
+		#define ADD_IMAGE_MENU_ITEM(Type, icon_name, Text) \
 			param_list.add("new_value", ValueBase((int)WidthPoint::Type)); \
 			item = Gtk::manage(new Gtk::ImageMenuItem( \
-				*Gtk::manage(new Gtk::Image(Gtk::StockID(StockId),Gtk::IconSize::from_name("synfig-small_icon"))), \
+				*Gtk::manage(create_image_from_icon(icon_name, Gtk::IconSize::from_name("synfig-small_icon"))), \
 				_(Text) )); \
 			item->signal_activate().connect( \
 				sigc::bind( \
@@ -1317,13 +1430,13 @@ Instance::make_param_menu(Gtk::Menu *menu,synfig::Canvas::Handle canvas, synfiga
 		////// Before //////////////////
 		param_list.add("value_desc",synfigapp::ValueDesc(wpoint_composite, wpoint_composite->get_link_index_from_name("side_before")));
 
-		ADD_IMAGE_MENU_ITEM(TYPE_INTERPOLATE, "synfig-interpolate_interpolation", "Cusp Before: Interpolate")
-		ADD_IMAGE_MENU_ITEM(TYPE_ROUNDED, "synfig-rounded_interpolation", "Cusp Before: Rounded")
-		ADD_IMAGE_MENU_ITEM(TYPE_SQUARED, "synfig-squared_interpolation", "Cusp Before: Squared")
-		ADD_IMAGE_MENU_ITEM(TYPE_PEAK, "synfig-peak_interpolation", "Cusp Before: Peak")
-		ADD_IMAGE_MENU_ITEM(TYPE_FLAT, "synfig-flat_interpolation", "Cusp Before: Flat")
-		ADD_IMAGE_MENU_ITEM(TYPE_INNER_ROUNDED, "synfig-rounded_interpolation", "Cusp Before: Inner Rounded")
-		ADD_IMAGE_MENU_ITEM(TYPE_INNER_PEAK, "synfig-peak_interpolation", "Cusp Before: Off-Peak")
+		ADD_IMAGE_MENU_ITEM(TYPE_INTERPOLATE, "action_interpolate_interpolation_icon", _("Cusp Before: Interpolate"))
+		ADD_IMAGE_MENU_ITEM(TYPE_ROUNDED, "action_rounded_interpolation_icon", _("Cusp Before: Rounded"))
+		ADD_IMAGE_MENU_ITEM(TYPE_SQUARED, "action_squared_interpolation_icon", _("Cusp Before: Squared"))
+		ADD_IMAGE_MENU_ITEM(TYPE_PEAK, "action_peak_interpolation_icon", _("Cusp Before: Peak"))
+		ADD_IMAGE_MENU_ITEM(TYPE_FLAT, "action_flat_interpolation_icon", _("Cusp Before: Flat"))
+		ADD_IMAGE_MENU_ITEM(TYPE_INNER_ROUNDED, "action_innerrounded_interpolation_icon", _("Cusp Before: Inner Rounded"))
+		ADD_IMAGE_MENU_ITEM(TYPE_INNER_PEAK, "action_offpeak_interpolation_icon", _("Cusp Before: Off-Peak"))
 
 		///////
 		item = Gtk::manage(new Gtk::SeparatorMenuItem());
@@ -1334,13 +1447,13 @@ Instance::make_param_menu(Gtk::Menu *menu,synfig::Canvas::Handle canvas, synfiga
 		param_list.erase("value_desc");
 		param_list.add("value_desc",synfigapp::ValueDesc(wpoint_composite, wpoint_composite->get_link_index_from_name("side_after")));
 
-		ADD_IMAGE_MENU_ITEM(TYPE_INTERPOLATE, "synfig-interpolate_interpolation", "Cusp After: Interpolate")
-		ADD_IMAGE_MENU_ITEM(TYPE_ROUNDED, "synfig-rounded_interpolation", "Cusp After: Rounded")
-		ADD_IMAGE_MENU_ITEM(TYPE_SQUARED, "synfig-squared_interpolation", "Cusp After: Squared")
-		ADD_IMAGE_MENU_ITEM(TYPE_PEAK, "synfig-peak_interpolation", "Cusp After: Peak")
-		ADD_IMAGE_MENU_ITEM(TYPE_FLAT, "synfig-flat_interpolation", "Cusp After: Flat")
-		ADD_IMAGE_MENU_ITEM(TYPE_INNER_ROUNDED, "synfig-rounded_interpolation", "Cusp After: Inner Rounded")
-		ADD_IMAGE_MENU_ITEM(TYPE_INNER_PEAK, "synfig-peak_interpolation", "Cusp After: Off-Peak")
+		ADD_IMAGE_MENU_ITEM(TYPE_INTERPOLATE, "action_interpolate_interpolation_icon", _("Cusp After: Interpolate"))
+		ADD_IMAGE_MENU_ITEM(TYPE_ROUNDED, "action_rounded_interpolation_icon", _("Cusp After: Rounded"))
+		ADD_IMAGE_MENU_ITEM(TYPE_SQUARED, "action_squared_interpolation_icon", _("Cusp After: Squared"))
+		ADD_IMAGE_MENU_ITEM(TYPE_PEAK, "action_peak_interpolation_icon", _("Cusp After: Peak"))
+		ADD_IMAGE_MENU_ITEM(TYPE_FLAT, "action_flat_interpolation_icon", _("Cusp After: Flat"))
+		ADD_IMAGE_MENU_ITEM(TYPE_INNER_ROUNDED, "action_innerrounded_interpolation_icon", _("Cusp After: Inner Rounded"))
+		ADD_IMAGE_MENU_ITEM(TYPE_INNER_PEAK, "action_offpeak_interpolation_icon", _("Cusp After: Off-Peak"))
 
 		///////
 		item = Gtk::manage(new Gtk::SeparatorMenuItem());
@@ -1379,7 +1492,7 @@ Instance::make_param_menu(Gtk::Menu *menu,synfig::Canvas::Handle canvas, synfiga
 }
 
 void
-edit_several_waypoints(etl::handle<CanvasView> canvas_view, std::list<synfigapp::ValueDesc> value_desc_list)
+edit_several_waypoints(CanvasView::Handle canvas_view, std::list<synfigapp::ValueDesc> value_desc_list)
 {
 	etl::handle<synfigapp::CanvasInterface> canvas_interface(canvas_view->canvas_interface());
 
@@ -1547,7 +1660,7 @@ Instance::gather_uri(std::set<synfig::String> &x, const synfig::ValueNode::Handl
 
 	Time t = value_node->get_parent_canvas()->get_time();
 
-	ParamVocab vocab = linkable_value_node->get_children_vocab();
+	const ParamVocab& vocab = linkable_value_node->get_children_vocab();
 	for(ParamVocab::const_iterator i = vocab.begin(); i != vocab.end(); ++i)
 	{
 		ValueNode::Handle child_node = linkable_value_node->get_link(i->get_name());
@@ -1586,7 +1699,7 @@ Instance::gather_uri(std::set<synfig::String> &x, const synfig::Layer::Handle &l
 			{
 				String filename = v.get(String());
 				if (!filename.empty() && filename[0] != '#')
-					filename = etl::absolute_path(layer->get_canvas()->get_file_path() + "/", filename);
+					filename = filesystem::Path::absolute_path(layer->get_canvas()->get_file_path() + "/", filename);
 				String uri = file_system->get_real_uri(filename);
 				if (!uri.empty()) x.insert(uri);
 			}
@@ -1601,7 +1714,7 @@ Instance::gather_uri(std::set<synfig::String> &x, const synfig::Layer::Handle &l
 	if (etl::handle<Layer_Switch> layer_switch = etl::handle<Layer_Switch>::cast_dynamic(layer))
 		gather_uri(x, layer_inside_switch(layer_switch));
 
-	//if (etl::handle<Layer_PasteCanvas> paste = etl::handle<Layer_PasteCanvas>::cast_dynamic(layer))
+	//if (Layer_PasteCanvas::Handle paste = Layer_PasteCanvas::Handle::cast_dynamic(layer))
 	//	gather_uri(x, paste->get_param("canvas").get(Canvas::Handle()));
 }
 
@@ -1634,7 +1747,7 @@ Instance::gather_uri(std::map<synfig::String, synfig::String> &x, const synfigap
 	std::set<String> uri_set;
 	gather_uri(uri_set, layers);
 	std::vector<String> uri_list;
-	std::vector<String> filename_list;
+	std::vector<filesystem::Path> filename_list;
 	for(std::set<String>::const_iterator i = uri_set.begin(); i != uri_set.end(); ++i)
 	{
 		String filename = Glib::filename_from_uri(*i);
@@ -1666,52 +1779,45 @@ Instance::add_special_layer_actions_to_group(const Glib::RefPtr<Gtk::ActionGroup
 void
 Instance::add_special_layer_actions_to_menu(Gtk::Menu *menu, const synfigapp::SelectionManager::LayerList &layers) const
 {
+	// Open files with external apps
 	std::map<String, String> uris;
 	gather_uri(uris, layers);
-	for(std::map<String, String>::const_iterator i = uris.begin(); i != uris.end(); ++i)
-	{
-		if(is_img(filename_extension(i->second)))// check if layer is image
-		{
-			Gtk::MenuItem *item = manage(new Gtk::ImageMenuItem(Gtk::Stock::OPEN));
-			item->set_label( (String(_("Edit image in external tool..."))).c_str() );
-			item->signal_activate().connect(
-				sigc::bind(sigc::ptr_fun(&App::open_img_in_external), i->second) );
-			item->show();
-			menu->append(*item);
+	for (auto i = uris.cbegin(); i != uris.cend(); ++i) {
+		String label;
+		Gtk::Action::SlotActivate func;
+		// check if layer is image
+		if (is_img(i->second)) {
+			label = _("Edit image in external tool...");
+			func = sigc::bind(sigc::ptr_fun(&App::open_img_in_external), i->second);
+		} else {
+			label = strprintf(_("Open file '%s'"), i->first.c_str());
+			func = sigc::bind(sigc::ptr_fun(&App::open_uri), i->second);
 		}
-		else
-		{
-			Gtk::MenuItem *item = manage(new Gtk::ImageMenuItem(Gtk::Stock::OPEN));
-			item->set_label( (String(_("Open file")) + " '" + i->first + "'").c_str() );
-			item->signal_activate().connect(
-				sigc::bind(sigc::ptr_fun(&App::open_uri), i->second) );
-			item->show();
-			menu->append(*item);	
-		}
+		Gtk::MenuItem *item = manage(new Gtk::ImageMenuItem(Gtk::Stock::OPEN));
+		item->set_label(label);
+		item->signal_activate().connect(func);
+		item->show();
+		menu->append(*item);
 	}
-	if(layers.size()==1)
-	{
-		if(etl::handle<Layer_Bitmap> my_layer_bitmap = etl::handle<Layer_Bitmap>::cast_dynamic(layers.front()))
-		{
-				Gtk::MenuItem *item2 = manage(new Gtk::ImageMenuItem(Gtk::Stock::CONVERT));
-				item2->set_label( (String(_("Convert to Vector"))).c_str() );
-				item2->signal_activate().connect(
-					sigc::bind(sigc::ptr_fun(&App::open_vectorizerpopup), my_layer_bitmap,layers.front()) );
-				item2->show();
-				menu->append(*item2);
-		}
-		else if(etl::handle<Layer_Switch> reference_layer = etl::handle<Layer_Switch>::cast_dynamic(layers.front()))
-		{
+
+	// Vectorizer
+	if (layers.size() == 1) {
+		Layer_Bitmap::Handle layer_bitmap;
+
+		if (auto reference_layer = etl::handle<Layer_Switch>::cast_dynamic(layers.front())) {
 			//the layer selected is a switch group
-			if(etl::handle<Layer_Bitmap> my_layer_bitmap = etl::handle<Layer_Bitmap>::cast_dynamic(layer_inside_switch(reference_layer)))
-			{
-				Gtk::MenuItem *item2 = manage(new Gtk::ImageMenuItem(Gtk::Stock::CONVERT));
-				item2->set_label( (String(_("Convert to Vector"))).c_str() );
-				item2->signal_activate().connect(
-					sigc::bind(sigc::ptr_fun(&App::open_vectorizerpopup), my_layer_bitmap,layers.front()) );
-				item2->show();
-				menu->append(*item2);
-			} 
+			layer_bitmap = Layer_Bitmap::Handle::cast_dynamic(layer_inside_switch(reference_layer));
+		} else {
+			layer_bitmap = Layer_Bitmap::Handle::cast_dynamic(layers.front());
+		}
+
+		if (layer_bitmap) {
+			Gtk::MenuItem *item2 = manage(new Gtk::ImageMenuItem(Gtk::Stock::CONVERT));
+			item2->set_label( (String(_("Convert to Vector"))).c_str() );
+			item2->signal_activate().connect(
+				sigc::bind(sigc::ptr_fun(&App::open_vectorizerpopup), layer_bitmap, layers.front()) );
+			item2->show();
+			menu->append(*item2);
 		}
 	}
 }
@@ -1721,66 +1827,53 @@ Instance::add_special_layer_actions_to_menu(Gtk::Menu *menu, const synfigapp::Se
 void
 Instance::add_special_layer_actions_to_group(const Glib::RefPtr<Gtk::ActionGroup>& action_group, synfig::String& ui_info, const synfigapp::SelectionManager::LayerList &layers) const
 {
+	// Open files with external apps
 	std::map<String, String> uris;
 	gather_uri(uris, layers);
 	int index = 0;
-	for(std::map<String, String>::const_iterator i = uris.begin(); i != uris.end(); ++i, ++index)
-	{
-		String action_name = etl::strprintf("special-action-open-file-%d", index);
-		//if the import layer is type image 
-		if(is_img(filename_extension(i->second)))
-		{
-			String local_name = String(_("Edit image in external tool..."));
-			action_group->add(
-				Gtk::Action::create(
-					action_name,
-					Gtk::Stock::OPEN,
-					local_name, local_name ),
-				sigc::bind(sigc::ptr_fun(&App::open_img_in_external), i->second) ); 
-			ui_info += strprintf("<menuitem action='%s' />", action_name.c_str());
+	for (auto i = uris.cbegin(); i != uris.cend(); ++i, ++index) {
+		String action_name = strprintf("special-action-open-file-%d", index);
+		String local_name;
+		Gtk::Action::SlotActivate func;
+		//if the import layer is type image
+		if (is_img(i->second)) {
+			local_name = _("Edit image in external tool...");
+			func = sigc::bind(sigc::ptr_fun(&App::open_img_in_external), i->second);
+		} else {
+			local_name = strprintf(_("Open file '%s'"), i->first.c_str());
+			func = sigc::bind(sigc::ptr_fun(&App::open_uri), i->second);
 		}
-		else
-		{
-			String local_name = String(_("Open file")) + " '" + i->first + "'";
-			action_group->add(
-				Gtk::Action::create(
-					action_name,
-					Gtk::Stock::OPEN,
-					local_name, local_name ),
-				sigc::bind(sigc::ptr_fun(&App::open_uri), i->second) );
-			ui_info += strprintf("<menuitem action='%s' />", action_name.c_str());
-		}
+
+		action_group->add(
+			Gtk::Action::create(
+				action_name,
+				Gtk::Stock::OPEN,
+				local_name, local_name ),
+			func );
+		ui_info += strprintf("<menuitem action='%s' />", action_name.c_str());
 	}
-	if(layers.size()==1)
-	{
-		String local_name2 = String(_("Convert to Vector"));
-		String action_name2 = etl::strprintf("special-action-open-file-vectorizer-%d",index);
-		if(etl::handle<Layer_Switch> reference_layer = etl::handle<Layer_Switch>::cast_dynamic(layers.front()))
-		{
+
+	// Vectorizer
+	if (layers.size() == 1)	{
+		String local_name = _("Convert to Vector");
+		String action_name = strprintf("special-action-open-file-vectorizer-%d", index);
+		Layer_Bitmap::Handle layer_bitmap;
+
+		if (auto reference_layer = etl::handle<Layer_Switch>::cast_dynamic(layers.front())) {
 			//the layer selected is a switch group
-			if(etl::handle<Layer_Bitmap> my_layer_bitmap = etl::handle<Layer_Bitmap>::cast_dynamic(layer_inside_switch(reference_layer)))
-			{
-				action_group->add(
-			 	Gtk::Action::create(
-			 		action_name2,
-			 		Gtk::Stock::CONVERT,
-			 		local_name2, local_name2 ),
-			 	sigc::bind(sigc::ptr_fun(&App::open_vectorizerpopup), my_layer_bitmap,layers.front()) );
-				 			ui_info += strprintf("<menuitem action='%s' />", action_name2.c_str());
-
-			} 
+			layer_bitmap = Layer_Bitmap::Handle::cast_dynamic(layer_inside_switch(reference_layer));
+		} else {
+			layer_bitmap = Layer_Bitmap::Handle::cast_dynamic(layers.front());
 		}
-		if(etl::handle<Layer_Bitmap> my_layer_bitmap = etl::handle<Layer_Bitmap>::cast_dynamic(layers.front()))
-		{
-				action_group->add(
-			 	Gtk::Action::create(
-			 		action_name2,
-			 		Gtk::Stock::CONVERT,
-			 		local_name2, local_name2 ),
-			 	sigc::bind(sigc::ptr_fun(&App::open_vectorizerpopup), my_layer_bitmap,layers.front()) );
-				 			ui_info += strprintf("<menuitem action='%s' />", action_name2.c_str());
 
-
+		if (layer_bitmap) {
+			action_group->add(
+				Gtk::Action::create(
+					action_name,
+					Gtk::Stock::CONVERT,
+					local_name, local_name ),
+				sigc::bind(sigc::ptr_fun(&App::open_vectorizerpopup), layer_bitmap, layers.front()) );
+			ui_info += strprintf("<menuitem action='%s' />", action_name.c_str());
 		}
 	}
 }

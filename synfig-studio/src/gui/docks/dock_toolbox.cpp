@@ -42,6 +42,7 @@
 #include <gtkmm/stock.h>
 #include <gtkmm/toolpalette.h>
 
+#include <gui/statemanager.h>
 #include <gui/app.h>
 #include <gui/canvasview.h>
 #include <gui/docks/dialog_tooloptions.h>
@@ -74,7 +75,7 @@ Dock_Toolbox::Dock_Toolbox():
 	set_size_request(-1,-1);
 
 	tool_item_group = manage(new class Gtk::ToolItemGroup());
-	gtk_tool_item_group_set_label(tool_item_group->gobj(), NULL);
+	gtk_tool_item_group_set_label(tool_item_group->gobj(), nullptr);
 
 	Gtk::ToolPalette *palette = manage(new Gtk::ToolPalette());
 	palette->add(*tool_item_group);
@@ -111,8 +112,6 @@ Dock_Toolbox::Dock_Toolbox():
 	drag_dest_set(listTargets);
 	signal_drag_data_received().connect( sigc::mem_fun(*this, &studio::Dock_Toolbox::on_drop_drag_data_received) );
 
-	changing_state_=false;
-
 	App::signal_present_all().connect(sigc::mem_fun0(*this,&Dock_Toolbox::present));
 }
 
@@ -122,8 +121,8 @@ Dock_Toolbox::~Dock_Toolbox()
 	//studio::App::cb.task(_("Toolbox: I was nailed!"));
 	//studio::App::quit();
 
-	if(studio::App::dock_toolbox==this)
-		studio::App::dock_toolbox=NULL;
+	if (studio::App::dock_toolbox == this)
+		studio::App::dock_toolbox = nullptr;
 }
 
 void Dock_Toolbox::write_layout_string(std::string& params) const
@@ -146,41 +145,13 @@ void Dock_Toolbox::read_layout_string(const std::string& params) const
 void
 Dock_Toolbox::set_active_state(const synfig::String& statename)
 {
-	std::map<synfig::String,Gtk::ToggleToolButton *>::iterator iter;
-
-	changing_state_=true;
-
 	synfigapp::Main::set_state(statename);
-
-	try
-	{
-
-		for(iter=state_button_map.begin();iter!=state_button_map.end();++iter)
-		{
-			if(iter->first==statename)
-			{
-				if(!iter->second->get_active())
-					iter->second->set_active(true);
-			}
-			else
-			{
-				if(iter->second->get_active())
-					iter->second->set_active(false);
-			}
-		}
-	}
-	catch(...)
-	{
-		changing_state_=false;
-		throw;
-	}
-	changing_state_=false;
 }
 
 void
 Dock_Toolbox::change_state(const synfig::String& statename, bool force)
 {
-	etl::handle<studio::CanvasView> canvas_view(studio::App::get_selected_canvas_view());
+	studio::CanvasView::Handle canvas_view(studio::App::get_selected_canvas_view());
 	if(canvas_view)
 	{
 		if(!force && statename==canvas_view->get_smach().get_state_name())
@@ -202,13 +173,10 @@ Dock_Toolbox::change_state(const synfig::String& statename, bool force)
 void
 Dock_Toolbox::change_state_(const Smach::state_base *state)
 {
-	if(changing_state_)
-		return;
-	changing_state_=true;
 
 	try
 	{
-		etl::handle<studio::CanvasView> canvas_view(studio::App::get_selected_canvas_view());
+		studio::CanvasView::Handle canvas_view(studio::App::get_selected_canvas_view());
 		if(canvas_view)
 				canvas_view->get_smach().enter(state);
 		else
@@ -216,11 +184,8 @@ Dock_Toolbox::change_state_(const Smach::state_base *state)
 	}
 	catch(...)
 	{
-		changing_state_=false;
 		throw;
 	}
-
-	changing_state_=false;
 }
 
 
@@ -235,22 +200,27 @@ Dock_Toolbox::add_state(const Smach::state_base *state)
 
 	String name=state->get_name();
 
-	Gtk::StockItem stock_item;
-	Gtk::Stock::lookup(Gtk::StockID("synfig-"+name),stock_item);
+	Gtk::RadioToolButton *tool_button = manage(new Gtk::RadioToolButton());
+	tool_button->set_group(radio_tool_button_group);
+	Glib::RefPtr<Gtk::Action> related_action = App::get_state_manager()->get_action_group()->get_action("state-"+name);
+	tool_button->set_related_action(related_action);
+	related_action->property_tooltip() = "";
 
-	Gtk::ToggleToolButton *tool_button = manage(new class Gtk::ToggleToolButton(
-		*manage(new Gtk::Image(
-			stock_item.get_stock_id(),
-			Gtk::IconSize::from_name("synfig-small_icon_16x16") )),
-		stock_item.get_label() ));
+	// Keeps updating the tooltip if user changes the shortcut at runtime
+	tool_button->property_has_tooltip() = true;
+	tool_button->signal_query_tooltip().connect([state](int,int,bool,const Glib::RefPtr<Gtk::Tooltip>& tooltip) -> bool
+	{
+		std::string tooltip_string = state->get_local_name();
 
-	Gtk::AccelKey key;
-	//Have a look to global function init_ui_manager() from app.cpp for "accel_path" definition
-	Gtk::AccelMap::lookup_entry ("<Actions>/action_group_state_manager/state-"+name, key);
-	//Gets the, is exist, accelerator representation for labels
-	Glib::ustring accel_path = key.is_null() ? "" : gtk_accelerator_get_label(key.get_key(), GdkModifierType(key.get_mod()));
-	
-	tool_button->set_tooltip_text(stock_item.get_label()+"  "+accel_path);
+		Gtk::AccelKey key;
+		if (Gtk::AccelMap::lookup_entry(std::string("<Actions>/action_group_state_manager/state-") + state->get_name(), key)) {
+			tooltip_string += "  ";
+			tooltip_string += gtk_accelerator_get_label(key.get_key(), GdkModifierType(key.get_mod()));
+		}
+		tooltip->set_text(tooltip_string);
+		return true;
+	});
+//	tool_button->set_tooltip_text(get_tooltip(name));
 	tool_button->show();
 
 	tool_item_group->insert(*tool_button);
@@ -258,12 +228,6 @@ Dock_Toolbox::add_state(const Smach::state_base *state)
 
 	state_button_map[name] = tool_button;
 
-	tool_button->signal_clicked().connect(
-		sigc::bind(
-			sigc::mem_fun(*this,&studio::Dock_Toolbox::change_state_),
-			state
-		)
-	);
 
 	refresh();
 }
@@ -273,19 +237,27 @@ void
 Dock_Toolbox::update_tools()
 {
 	etl::handle<Instance> instance = App::get_selected_instance();
-	etl::handle<CanvasView> canvas_view = App::get_selected_canvas_view();
+	CanvasView::Handle canvas_view = App::get_selected_canvas_view();
 
-	// These next several lines just adjust the tool buttons
-	// so that they are only clickable when they should be.
-	bool sensitive = instance && canvas_view;
-	std::map<synfig::String,Gtk::ToggleToolButton *>::iterator iter;
-	for(iter=state_button_map.begin();iter!=state_button_map.end();++iter)
-		iter->second->set_sensitive(sensitive);
+	Glib::RefPtr<Gtk::ActionGroup> state_action_group = App::get_state_manager()->get_action_group();
+	// avoid unnecessary events for radio_button->set_active(true);
+	// this method is called on switching doc tabs, it is not actually activating an action
+	state_action_group->set_sensitive(false);
 
-	if (canvas_view && canvas_view->get_smach().get_state_name())
-		set_active_state(canvas_view->get_smach().get_state_name());
-	else
+	const char* canvasview_state_name = canvas_view ? canvas_view->get_smach().get_state_name() : nullptr;
+	if (canvasview_state_name) {
+		set_active_state(canvasview_state_name);
+		auto radio_button = state_button_map[canvasview_state_name];
+		if (radio_button) {
+			if (!radio_button->get_active())
+				radio_button->set_active(true);
+		}
+	} else
 		set_active_state("none");
+
+	// Disable buttons if there isn't any open document instance
+	bool sensitive = instance && canvas_view;
+	state_action_group->set_sensitive(sensitive);
 }
 
 
@@ -306,39 +278,26 @@ Dock_Toolbox::on_drop_drag_data_received(const Glib::RefPtr<Gdk::DragContext>& c
 	{
 		synfig::String selection_data((gchar *)(selection_data_.get_data()));
 
-		// For some reason, GTK hands us a list of URLs separated
-		// by not only Carriage-Returns, but also Line-Feeds.
-		// Line-Feeds will mess us up. Remove all the line-feeds.
-		while(selection_data.find_first_of('\r')!=synfig::String::npos)
-			selection_data.erase(selection_data.begin()+selection_data.find_first_of('\r'));
-
 		std::stringstream stream(selection_data);
 
 		while(stream)
 		{
-			synfig::String filename,URI;
-			getline(stream,filename);
+			synfig::String line;
+			getline(stream, line);
+
+			line = trim(line);
 
 			// If we don't have a filename, move on.
-			if(filename.empty())
+			if (line.empty())
 				continue;
 
-			// Make sure this URL is of the "file://" type.
-			URI=String(filename.begin(),filename.begin()+sizeof("file://")-1);
-			if(URI!="file://")
-			{
-				synfig::warning("Unknown URI (%s) in \"%s\"",URI.c_str(),filename.c_str());
-				continue;
-			}
+			filesystem::Path filename = filesystem::Path::from_uri(line);
 
-			// Strip the "file://" part from the filename
-			filename=synfig::String(filename.begin()+sizeof("file://")-1,filename.end());
-
-			synfig::info("Attempting to open "+filename);
+			synfig::info("Attempting to open %s", filename.u8_str());
 			if(App::open(filename))
 				success=true;
 			else
-				synfig::error("Drop failed: Unable to open "+filename);
+				synfig::error("Drop failed: Unable to open %s", filename.u8_str());
 		}
 	}
 	else

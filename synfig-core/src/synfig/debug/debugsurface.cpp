@@ -57,21 +57,21 @@ using namespace debug;
 /* === M E T H O D S ======================================================= */
 
 void
-DebugSurface::save_to_file(const void *buffer, int width, int height, int pitch, const String &filename, bool overwrite)
+DebugSurface::save_to_file(const void *buffer, int width, int height, int pitch, const filesystem::Path& filename, bool overwrite)
 {
 	// generate filename
-	String actual_filename =
+    filesystem::Path actual_filename =
 		overwrite
 		? filename
 		: FileSystemTemporary::generate_indexed_temporary_filename(
-			FileSystemNative::instance(),
-			filename + ".tga" );
+            FileSystemNative::instance(),
+            filename + filesystem::Path{".tga"} );
 
-	if (buffer == NULL || width <= 0 || height <= 0)
+	if (!buffer || width <= 0 || height <= 0)
 	{
 		// save empty file for empty surface
 		FileSystemNative::instance()
-			->get_write_stream(actual_filename);
+            ->get_write_stream(actual_filename.u8string());
 	}
 	else
 	{
@@ -88,12 +88,12 @@ DebugSurface::save_to_file(const void *buffer, int width, int height, int pitch,
 		// write rows in reverse order (for TGA format)
 		color_to_pixelformat(
 			byte_buffer + total_bytes - row_bytes,
-			(const Color*)buffer, pf, NULL, width, height, -row_bytes, pitch );
+			(const Color*)buffer, pf, nullptr, width, height, -row_bytes, pitch );
 
 		// create file
 		FileSystem::WriteStream::Handle ws =
 			FileSystemNative::instance()
-				->get_write_stream(actual_filename);
+                ->get_write_stream(actual_filename.u8string());
 
 		// write header
 		unsigned char targa_header[] = {
@@ -120,36 +120,36 @@ DebugSurface::save_to_file(const void *buffer, int width, int height, int pitch,
 }
 
 void
-DebugSurface::save_to_file(const Surface &surface, const String &filename, bool overwrite)
+DebugSurface::save_to_file(const Surface &surface, const filesystem::Path& filename, bool overwrite)
 {
 	if (surface.is_valid())
 		save_to_file(&surface[0][0], surface.get_w(), surface.get_h(), surface.get_pitch(), filename, overwrite);
 	else
-		save_to_file(NULL, 0, 0, 0, filename, overwrite);
+		save_to_file(nullptr, 0, 0, 0, filename, overwrite);
 }
 
 void
-DebugSurface::save_to_file(const rendering::Surface &surface, const String &filename, bool overwrite)
+DebugSurface::save_to_file(const rendering::Surface &surface, const filesystem::Path& filename, bool overwrite)
 {
 	if (surface.is_exists()) {
 		std::vector<Color> buffer(surface.get_pixels_count());
 		surface.get_pixels(&buffer.front());
 		save_to_file(&buffer.front(), surface.get_width(), surface.get_height(), 0, filename, overwrite);
 	} else
-		save_to_file(NULL, 0, 0, 0, filename, overwrite);
+		save_to_file(nullptr, 0, 0, 0, filename, overwrite);
 }
 
 void
-DebugSurface::save_to_file(const rendering::Surface::Handle &surface, const String &filename, bool overwrite)
+DebugSurface::save_to_file(const rendering::Surface::Handle &surface, const filesystem::Path& filename, bool overwrite)
 {
 	if (surface)
 		save_to_file(*surface, filename, overwrite);
 	else
-		save_to_file(NULL, 0, 0, 0, filename, overwrite);
+		save_to_file(nullptr, 0, 0, 0, filename, overwrite);
 }
 
 void
-DebugSurface::save_to_file(const rendering::SurfaceResource::Handle &surface, const String &filename, bool overwrite) {
+DebugSurface::save_to_file(const rendering::SurfaceResource::Handle &surface, const filesystem::Path& filename, bool overwrite) {
 	rendering::SurfaceResource::LockReadBase lock(surface);
 	if (lock.convert(rendering::Surface::Token::Handle(), false, true)) {
 		save_to_file(*lock.get_surface(), filename, overwrite);
@@ -159,6 +159,6 @@ DebugSurface::save_to_file(const rendering::SurfaceResource::Handle &surface, co
 		std::vector<Color> buffer(size[0] * size[1]);
 		save_to_file(&buffer.front(), size[0], size[1], 0, filename, overwrite);
 	} else {
-		save_to_file(NULL, 0, 0, 0, filename, overwrite);
+		save_to_file(nullptr, 0, 0, 0, filename, overwrite);
 	}
 }

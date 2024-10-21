@@ -51,7 +51,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Pow, RELEASE_VERSION_0_62_00, "power", "Power")
+REGISTER_VALUENODE(ValueNode_Pow, RELEASE_VERSION_0_62_00, "power", N_("Power"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -60,8 +60,7 @@ REGISTER_VALUENODE(ValueNode_Pow, RELEASE_VERSION_0_62_00, "power", "Power")
 ValueNode_Pow::ValueNode_Pow(const ValueBase &x):
 	LinkableValueNode(x.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	Real value(x.get(Real()));
 	Real infinity(999999.0);
 	Real epsilon(0.000001);
@@ -119,8 +118,8 @@ ValueNode_Pow::get_link_vfunc(int i)const
 ValueBase
 ValueNode_Pow::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	Real base     = (*base_)    (t).get(Real());
 	Real power    = (*power_)   (t).get(Real());
@@ -171,22 +170,22 @@ ValueNode_Pow::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"base")
+	ret.push_back(ParamDesc("base")
 		.set_local_name(_("Base"))
 		.set_description(_("The base to be raised to the power"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"power")
+	ret.push_back(ParamDesc("power")
 		.set_local_name(_("Power"))
 		.set_description(_("The power used to raise the base"))
 	);
 
-		ret.push_back(ParamDesc(ValueBase(),"epsilon")
+		ret.push_back(ParamDesc("epsilon")
 		.set_local_name(_("Epsilon"))
 		.set_description(_("Value used to compare base or power with zero "))
 	);
 
-		ret.push_back(ParamDesc(ValueBase(),"infinite")
+		ret.push_back(ParamDesc("infinite")
 		.set_local_name(_("Infinite"))
 		.set_description(_("Returned value when result tends to infinite"))
 	);

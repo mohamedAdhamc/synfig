@@ -35,6 +35,7 @@
 #endif
 
 #include "palette.h"
+
 #include "surface.h"
 #include "general.h"
 #include "filesystemnative.h"
@@ -47,7 +48,6 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 
 /* === M A C R O S ========================================================= */
@@ -299,12 +299,12 @@ Palette::grayscale(int steps, ColorReal gamma)
 }
 
 void
-Palette::save_to_file(const synfig::String& filename) const
+Palette::save_to_file(const synfig::filesystem::Path& filename) const
 {
-	FileSystem::WriteStream::Handle file = FileSystemNative::instance()->get_write_stream(filename);
+	FileSystem::WriteStream::Handle file = FileSystemNative::instance()->get_write_stream(filename.u8string());
 
 	if(!file)
-		throw strprintf(_("Unable to open %s for write"),filename.c_str());
+		throw strprintf(_("Unable to open %s for write"),filename.u8_str());
 
 	*file << PALETTE_SYNFIG_FILE_COOKIE << "\n" << name_ << "\n";
 	for (const_iterator iter=begin();iter!=end();++iter) {
@@ -317,16 +317,16 @@ Palette::save_to_file(const synfig::String& filename) const
 }
 
 Palette
-Palette::load_from_file(const synfig::String& filename)
+Palette::load_from_file(const synfig::filesystem::Path& filename)
 {
-	FileSystem::ReadStream::Handle file = FileSystemNative::instance()->get_read_stream(filename);
+	FileSystem::ReadStream::Handle file = FileSystemNative::instance()->get_read_stream(filename.u8string());
 
 	if(!file)
-		throw strprintf(_("Unable to open %s for read"),filename.c_str());
+		throw strprintf(_("Unable to open %s for read"), filename.u8_str());
 
 	Palette ret;
 	std::string line("");
-	const std::string ext(filename_extension(filename));
+	const std::string ext(filename.extension().u8string());
 
 
 	if (ext==PALETTE_SYNFIG_EXT)
@@ -334,23 +334,24 @@ Palette::load_from_file(const synfig::String& filename)
 		getline(*file, line);
 
 		if(line!=PALETTE_SYNFIG_FILE_COOKIE)
-			throw strprintf(_("%s does not appear to be a valid %s palette file"),filename.c_str(),"Synfig");
+			throw strprintf(_("%s does not appear to be a valid %s palette file"), filename.u8_str(), "Synfig");
 
 		getline(*file, ret.name_);
 
-		while(!file->eof())	{
+		std::string line_trail;
+
+		while(file->good())	{
 			PaletteItem item;
 			float r, g, b, a;
 			getline(*file, item.name);
 			*file >> r >> g >> b >> a;
-			item.color.set_r(r);
-			item.color.set_g(g);
-			item.color.set_b(b);
-			item.color.set_a(a);
+			item.color.set_r(r).set_g(g).set_b(b).set_a(a);
 
 			// file ends in new line
-			if (!file->eof())
+			if (file->good())
 				ret.push_back(item);
+
+			getline(*file, line_trail);
 		}
 	}
 	else if (ext==PALETTE_GIMP_EXT)
@@ -369,43 +370,41 @@ Palette::load_from_file(const synfig::String& filename)
 		[<new line>]
 		*/
 
+		int line_num = 0;
+
+		// skip initial empty lines on malformed files
 		do {
 			getline(*file, line);
-		} while (!file->eof() && line != PALETTE_GIMP_FILE_COOKIE);
+			line_num++;
+		} while (file->good() && line.empty());
 
 		if (line != PALETTE_GIMP_FILE_COOKIE)
-			throw strprintf(_("%s does not appear to be a valid %s palette file"),filename.c_str(),"GIMP");
+			throw strprintf(_("%s does not appear to be a valid %s palette file"), filename.u8_str(), "GIMP");
 
-
-		bool has_color = false;
-
-		do
+		while (file->good())
 		{
 			getline(*file, line);
+			line_num++;
 
-			if (!line.empty() && line.substr(0,5) == "Name:")
+			if (line.empty())
+				continue;
+
+			if (line.substr(0,5) == "Name:")
 				ret.name_ = String(line.substr(6));
-			else if (!line.empty() && line.substr(0,8) == "Columns:")
+			else if (line.substr(0,8) == "Columns:")
 				; // Ignore columns
-			else if (!line.empty() && line.substr(0,1) == "#")
+			else if (line.substr(0,1) == "#")
 				; // Ignore comments
-			else if (!line.empty())
-			{
-				// not empty line not part of the header => color
-				has_color = true;
-				// line contains the first color so we put it back in (including \n)
-				for (int i = line.length()+1; i; i--)
-					file->unget();
-			}
-		} while (!file->eof() && !has_color);
+			else
+				break;
+		}
 
-		while(!file->eof() && has_color)
+		while(file->good())
 		{
 			PaletteItem item;
-			float r, g, b;
+			int r, g, b;
 
 			std::stringstream ss;
-			getline(*file, line);
 
 			if (!line.empty())
 			{
@@ -414,18 +413,21 @@ Palette::load_from_file(const synfig::String& filename)
 			 	ss >> r >> g >> b;
 				getline(ss, item.name);
 
-				item.color.set_r(r/255);
-				item.color.set_g(g/255);
-				item.color.set_b(b/255);
+				item.color.set_r(r/255.f).set_g(g/255.f).set_b(b/255.f);
 				// Alpha is 1 by default
 				item.color.set_a(1);
 
 				ret.push_back(item);
 			}
+
+			getline(*file, line);
+			line_num++;
+			if (!file->eof() && file->fail())
+				warning(_("could not properly load palette: error parsing line #%i (%s)"), line_num, filename.u8_str());
 		}
 	}
 	else
-		throw strprintf(_("%s does not appear to be a supported palette file"),filename.c_str());
+		throw strprintf(_("%s does not appear to be a supported palette file"), filename.u8_str());
 
 	return ret;
 }

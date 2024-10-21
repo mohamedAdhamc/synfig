@@ -50,7 +50,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Switch, RELEASE_VERSION_0_61_08, "switch", "Switch")
+REGISTER_VALUENODE(ValueNode_Switch, RELEASE_VERSION_0_61_08, "switch", N_("Switch"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -59,13 +59,13 @@ REGISTER_VALUENODE(ValueNode_Switch, RELEASE_VERSION_0_61_08, "switch", "Switch"
 ValueNode_Switch::ValueNode_Switch(Type &x):
 	LinkableValueNode(x)
 {
+	init_children_vocab();
 }
 
 ValueNode_Switch::ValueNode_Switch(const ValueBase &x):
 	LinkableValueNode(x.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	set_link("link_off",ValueNode_Const::create(x));
 	set_link("link_on",ValueNode_Const::create(x));
 	set_link("switch",ValueNode_Const::create(bool(false)));
@@ -119,8 +119,8 @@ ValueNode_Switch::get_link_vfunc(int i)const
 ValueBase
 ValueNode_Switch::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	return (*switch_)(t).get(bool()) ? (*link_on_)(t) : (*link_off_)(t);
 }
@@ -144,17 +144,17 @@ ValueNode_Switch::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"link_off")
+	ret.push_back(ParamDesc("link_off")
 		.set_local_name(_("Link Off"))
 		.set_description(_("The value node returned when the switch is off"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"link_on")
+	ret.push_back(ParamDesc("link_on")
 		.set_local_name(_("Link On"))
 		.set_description(_("The value node returned when the switch is on"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"switch")
+	ret.push_back(ParamDesc("switch")
 		.set_local_name(_("Switch"))
 		.set_description(_("When checked, returns 'Link On', otherwise returns 'Link Off'"))
 	);

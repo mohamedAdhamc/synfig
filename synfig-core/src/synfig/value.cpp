@@ -35,20 +35,6 @@
 #endif
 
 #include "value.h"
-#include "general.h"
-#include <synfig/localization.h>
-#include "canvas.h"
-#include "valuenodes/valuenode_bone.h"
-#include "gradient.h"
-#include "matrix.h"
-#include "transformation.h"
-
-
-
-#include "vector.h"
-#include "time.h"
-#include "segment.h"
-#include "color.h"
 
 #endif
 
@@ -148,7 +134,7 @@ ValueBase::create(Type &type)
 	Operation::CreateFunc func =
 		Type::get_operation<Operation::CreateFunc>(
 			Operation::Description::get_create(type.identifier) );
-	assert(func != NULL);
+	assert(func);
 	clear();
 	this->type = &type;
 	data = func();
@@ -210,7 +196,7 @@ ValueBase::clear()
 		Operation::DestroyFunc func =
 			Type::get_operation<Operation::DestroyFunc>(
 				Operation::Description::get_destroy(type->identifier) );
-		assert(func != NULL);
+		assert(func);
 		func(data);
 	}
 	ref_count.detach();

@@ -33,8 +33,6 @@
 #	include <config.h>
 #endif
 
-#include <ETL/misc>
-
 #include "layer_bitmap.h"
 
 #include <synfig/time.h>
@@ -44,6 +42,7 @@
 #include <synfig/context.h>
 #include <synfig/time.h>
 #include <synfig/color.h>
+#include <synfig/misc.h>
 #include <synfig/surface.h>
 #include <synfig/renddesc.h>
 #include <synfig/target.h>
@@ -62,7 +61,6 @@
 /* === U S I N G =========================================================== */
 
 using namespace synfig;
-using namespace etl;
 
 /* === G L O B A L S ======================================================= */
 
@@ -190,6 +188,12 @@ Layer_Bitmap::get_param_vocab()const
 synfig::Layer::Handle
 Layer_Bitmap::hit_check(synfig::Context context, const synfig::Point &pos)const
 {
+	bool check_myself_first;
+	auto layer = basic_hit_check(context, pos, check_myself_first);
+
+	if (!check_myself_first)
+		return layer;
+
 	Point tl(param_tl.get(Point()));
 	Point br(param_br.get(Point()));
 	Point surface_pos;
@@ -318,8 +322,8 @@ synfig::Layer_Bitmap::get_color(Context context, const Point &pos)const
 				case 0:	// Nearest Neighbor
 				default:
 					{
-						int x(std::min(w-1,std::max(0,round_to_int(surface_pos[0]))));
-						int y(std::min(h-1,std::max(0,round_to_int(surface_pos[1]))));
+						int x(synfig::clamp(round_to_int(surface_pos[0]), 0, w-1));
+						int y(synfig::clamp(round_to_int(surface_pos[1]), 0, h-1));
 						ret= surface[y][x];
 					}
 				break;

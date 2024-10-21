@@ -30,18 +30,18 @@
 
 /* === H E A D E R S ======================================================= */
 
-#include "action.h"
-#include <ETL/handle>
-#include <synfig/canvas.h>
-#include <synfig/string.h>
-#include <synfig/filesystemtemporary.h>
-#include <synfig/filesystemgroup.h>
 #include <list>
 #include <set>
-#include <sigc++/sigc++.h>
+
+#include <ETL/handle>
+
+#include <synfig/canvas.h>
+#include <synfig/rendering/surface.h>
+#include <synfig/string.h>
+
+#include "action.h"
 #include "action_system.h"
 #include "selectionmanager.h"
-#include <synfig/rendering/surface.h>
 
 /* === M A C R O S ========================================================= */
 
@@ -142,7 +142,7 @@ private:
 	void process_filenames_undo(const ProcessFilenamesParams &params);
 
 protected:
-	Instance(etl::handle<synfig::Canvas>, synfig::FileSystem::Handle container);
+	Instance(synfig::Canvas::Handle, synfig::FileSystem::Handle container);
 
 	/*
  -- ** -- P U B L I C   M E T H O D S -----------------------------------------
@@ -203,10 +203,10 @@ public:
 
 
 public:	// Constructor interfaces
-	static etl::handle<Instance> create(etl::handle<synfig::Canvas> canvas, synfig::FileSystem::Handle container);
+	static etl::handle<Instance> create(synfig::Canvas::Handle canvas, synfig::FileSystem::Handle container);
 }; // END class Instance
 
-etl::handle<Instance> find_instance(etl::handle<synfig::Canvas> canvas);
+etl::handle<Instance> find_instance(synfig::Canvas::Handle canvas);
 
 bool is_editable(synfig::ValueNode::Handle value_node);
 

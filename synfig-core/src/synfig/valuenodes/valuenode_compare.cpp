@@ -51,7 +51,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Compare, RELEASE_VERSION_0_62_00, "compare", "Compare")
+REGISTER_VALUENODE(ValueNode_Compare, RELEASE_VERSION_0_62_00, "compare", N_("Compare"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -60,8 +60,7 @@ REGISTER_VALUENODE(ValueNode_Compare, RELEASE_VERSION_0_62_00, "compare", "Compa
 ValueNode_Compare::ValueNode_Compare(const ValueBase &x):
 	LinkableValueNode(x.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	bool value(x.get(bool()));
 
 	set_link("lhs",          ValueNode_Const::create(Real(0)));
@@ -123,8 +122,8 @@ ValueNode_Compare::get_link_vfunc(int i)const
 ValueBase
 ValueNode_Compare::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	Real lhs      = (*lhs_)     (t).get(Real());
 	Real rhs      = (*rhs_)     (t).get(Real());
@@ -158,27 +157,27 @@ ValueNode_Compare::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"lhs")
+	ret.push_back(ParamDesc("lhs")
 		.set_local_name(_("LHS"))
 		.set_description(_("The left side of the comparison"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"rhs")
+	ret.push_back(ParamDesc("rhs")
 		.set_local_name(_("RHS"))
 		.set_description(_("The right side of the comparison"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"greater")
+	ret.push_back(ParamDesc("greater")
 		.set_local_name(_("Greater"))
 		.set_description(_("When checked, returns true if LHS > RHS"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"equal")
+	ret.push_back(ParamDesc("equal")
 		.set_local_name(_("Equal"))
 		.set_description(_("When checked, returns true if LHS = RHS"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"less")
+	ret.push_back(ParamDesc("less")
 		.set_local_name(_("Less"))
 		.set_description(_("When checked, returns true if LHS < RHS"))
 	);

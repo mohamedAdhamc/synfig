@@ -90,7 +90,7 @@ public:
 
 class studio::StateScale_Context : public sigc::trackable
 {
-	etl::handle<CanvasView> canvas_view_;
+	CanvasView::Handle canvas_view_;
 	CanvasView::IsWorking is_working;
 
 	synfigapp::Settings& settings;
@@ -120,7 +120,7 @@ public:
 
 	~StateScale_Context();
 
-	const etl::handle<CanvasView>& get_canvas_view()const{return canvas_view_;}
+	const CanvasView::Handle& get_canvas_view()const{return canvas_view_;}
 	etl::handle<synfigapp::CanvasInterface> get_canvas_interface()const{return canvas_view_->canvas_interface();}
 	synfig::Canvas::Handle get_canvas()const{return canvas_view_->get_canvas();}
 	WorkArea * get_work_area()const{return canvas_view_->get_work_area();}
@@ -132,7 +132,7 @@ public:
 /* === M E T H O D S ======================================================= */
 
 StateScale::StateScale():
-	Smach::state<StateScale_Context>("scale")
+	Smach::state<StateScale_Context>("scale", N_("Scale Tool"))
 {
 	insert(event_def(EVENT_REFRESH_TOOL_OPTIONS,&StateScale_Context::event_refresh_tool_options));
 	insert(event_def(EVENT_STOP,&StateScale_Context::event_stop_handler));
@@ -295,7 +295,7 @@ DuckDrag_Scale::begin_duck_drag(Duckmatic* duckmatic, const synfig::Vector& offs
 	// Calculate center
 	Point vmin(100000000,100000000);
 	Point vmax(-100000000,-100000000);
-	//std::set<etl::handle<Duck> >::iterator iter;
+	//std::set<Duck::Handle>::iterator iter;
 	positions.clear();
 	int i;
 	for(i=0,iter=selected_ducks.begin();iter!=selected_ducks.end();++iter,i++)
@@ -325,7 +325,7 @@ DuckDrag_Scale::duck_drag(Duckmatic* duckmatic, const synfig::Vector& vector)
 	if(bad_drag)
 		return;
 
-	//std::set<etl::handle<Duck> >::iterator iter;
+	//std::set<Duck::Handle>::iterator iter;
 	synfig::Vector vect(duckmatic->snap_point_to_grid(vector)-center);
 	last_scale=vect;
 

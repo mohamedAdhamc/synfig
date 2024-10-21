@@ -58,19 +58,14 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 using namespace studio;
 
 /* === M A C R O S ========================================================= */
 
 #ifndef LAYER_CREATION
-#define LAYER_CREATION(button, stockid, tooltip)	\
-	{ \
-		Gtk::Image *icon = manage(new Gtk::Image(Gtk::StockID(stockid), \
-			Gtk::ICON_SIZE_SMALL_TOOLBAR)); \
-		button.add(*icon); \
-	} \
+#define LAYER_CREATION(button, icon_name, tooltip)	\
+	button.set_image_from_icon_name(icon_name, Gtk::BuiltinIconSize::ICON_SIZE_SMALL_TOOLBAR); \
 	button.set_relief(Gtk::RELIEF_NONE); \
 	button.set_tooltip_text(tooltip) ;\
 	button.signal_toggled().connect(sigc::mem_fun(*this, \
@@ -87,14 +82,14 @@ StateStar studio::state_star;
 
 class studio::StateStar_Context : public sigc::trackable
 {
-	etl::handle<CanvasView> canvas_view_;
+	CanvasView::Handle canvas_view_;
 	CanvasView::IsWorking is_working;
 
 	Duckmatic::Push duckmatic_push;
 
 	Point point_holder;
 
-	etl::handle<Duck> point2_duck;
+	Duck::Handle point2_duck;
 
 	void refresh_ducks();
 
@@ -287,7 +282,7 @@ public:
 	~StateStar_Context();
 
 	//Canvas interaction
-	const etl::handle<CanvasView>& get_canvas_view()const{return canvas_view_;}
+	const CanvasView::Handle& get_canvas_view()const{return canvas_view_;}
 	etl::handle<synfigapp::CanvasInterface> get_canvas_interface()const{return canvas_view_->canvas_interface();}
 	synfig::Canvas::Handle get_canvas()const{return canvas_view_->get_canvas();}
 	WorkArea * get_work_area()const{return canvas_view_->get_work_area();}
@@ -314,7 +309,7 @@ public:
 /* === M E T H O D S ======================================================= */
 
 StateStar::StateStar():
-	Smach::state<StateStar_Context>("star")
+	Smach::state<StateStar_Context>("star", N_("Star Tool"))
 {
 	insert(event_def(EVENT_LAYER_SELECTION_CHANGED,&StateStar_Context::event_layer_selection_changed_handler));
 	insert(event_def(EVENT_STOP,&StateStar_Context::event_stop_handler));
@@ -347,9 +342,9 @@ StateStar_Context::load_settings()
 
 		set_opacity(settings.get_value("star.opacity", 1.0));
 
-		set_bline_width(settings.get_value("star.bline_width", Distance("1px")));
+		set_bline_width(settings.get_value("star.bline_width", Distance("1px")).as(App::distance_system, get_canvas()->rend_desc()));
 
-		set_feather_size(settings.get_value("star.feather", Distance("0px")));
+		set_feather_size(settings.get_value("star.feather", Distance("0px")).as(App::distance_system, get_canvas()->rend_desc()));
 
 		set_number_of_points(settings.get_value("star.number_of_points", 5));
 
@@ -531,17 +526,17 @@ StateStar_Context::StateStar_Context(CanvasView* canvas_view):
 	layer_types_label.set_valign(Gtk::ALIGN_CENTER);
 
 	LAYER_CREATION(layer_star_togglebutton,
-		("synfig-layer_geometry_star"), _("Create a star layer"));
+		"layer_geometry_star_icon", _("Create a star layer"));
 	LAYER_CREATION(layer_region_togglebutton,
-		("synfig-layer_geometry_region"), _("Create a region layer"));
+		"layer_geometry_region_icon", _("Create a region layer"));
 	LAYER_CREATION(layer_outline_togglebutton,
-		("synfig-layer_geometry_outline"), _("Create an outline layer"));
+		"layer_geometry_outline_icon", _("Create an outline layer"));
 	LAYER_CREATION(layer_advanced_outline_togglebutton,
-		("synfig-layer_geometry_advanced_outline"), _("Create an advanced outline layer"));
+		"layer_geometry_advanced_outline_icon", _("Create an advanced outline layer"));
 	LAYER_CREATION(layer_plant_togglebutton,
-		("synfig-layer_other_plant"), _("Create a plant layer"));
+		"layer_other_plant_icon", _("Create a plant layer"));
 	LAYER_CREATION(layer_curve_gradient_togglebutton,
-		("synfig-layer_gradient_curve"), _("Create a gradient layer"));
+		"layer_gradient_curve_icon", _("Create a gradient layer"));
 
 	layer_star_togglebutton.get_style_context()->add_class("indentation");
 	layer_types_box.pack_start(layer_star_togglebutton, false, false, 0);
@@ -557,7 +552,7 @@ StateStar_Context::StateStar_Context(CanvasView* canvas_view):
 	blend_label.get_style_context()->add_class("gap");
 	blend_box.pack_start(blend_label, false, false, 0);
 
-	blend_enum.set_param_desc(ParamDesc(Color::BLEND_COMPOSITE,"blend_method")
+	blend_enum.set_param_desc(ParamDesc("blend_method")
 		.set_local_name(_("Blend Method"))
 		.set_description(_("Defines the blend method to be used for stars")));
 
@@ -1372,7 +1367,7 @@ StateStar_Context::event_mouse_click_handler(const Smach::event& x)
 	if(event.key==EVENT_WORKAREA_MOUSE_BUTTON_DOWN && event.button==BUTTON_LEFT)
 	{
 		point_holder=get_work_area()->snap_point_to_grid(event.pos);
-		etl::handle<Duck> duck=new Duck();
+		Duck::Handle duck = new Duck();
 		duck->set_point(point_holder);
 		duck->set_name("p1");
 		duck->set_type(Duck::TYPE_POSITION);

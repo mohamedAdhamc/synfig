@@ -19,6 +19,7 @@ _debug/
 _production/
 _packages/
 
+.cache
 .kdev4/
 
 # ---- MacOS thumbnails ------------
@@ -60,6 +61,7 @@ compile
 /_debug/
 /_production/
 /_release/
+/build-cmake/
 /build.conf
 
 # ------------------------------------------------------------------------
@@ -224,7 +226,6 @@ ETL/test/handle
 ETL/test/hermite
 ETL/test/pen
 ETL/test/smach
-ETL/test/smart_ptr
 ETL/test/stringf
 ETL/test/surface
 

@@ -53,7 +53,6 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 using namespace studio;
 
@@ -131,8 +130,7 @@ bool
 DockDialog::on_delete_event(GdkEventAny * /* event */)
 {
 	SYNFIG_EXCEPTION_GUARD_BEGIN()
-	for(std::list<Dockable*>::iterator i = App::dock_manager->dockable_list_.begin(); i != App::dock_manager->dockable_list_.end(); i++)
-	{
+	for (std::list<Dockable*>::iterator i = App::dock_manager->dockable_list_.begin(); i != App::dock_manager->dockable_list_.end(); ++i) {
 		if ((*i)->get_parent_window() == get_window())
 		{
 			CanvasView *canvas_view = dynamic_cast<CanvasView*>(*i);
@@ -163,8 +161,8 @@ bool DockDialog::on_key_press_event(GdkEventKey* key_event)
 bool
 DockDialog::close()
 {
-	if (getenv("SYNFIG_DEBUG_DESTRUCTORS"))
-		synfig::info("DockDialog::close(): Deleted");
+	DEBUG_LOG("SYNFIG_DEBUG_DESTRUCTORS",
+		"DockDialog::close(): Deleted");
 
 	empty_sig.disconnect();
 	//get_dock_book().clear();

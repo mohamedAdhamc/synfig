@@ -51,7 +51,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_VectorY, RELEASE_VERSION_0_61_09, "vectory", "Vector Y")
+REGISTER_VALUENODE(ValueNode_VectorY, RELEASE_VERSION_0_61_09, "vectory", N_("Vector Y"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -60,8 +60,7 @@ REGISTER_VALUENODE(ValueNode_VectorY, RELEASE_VERSION_0_61_09, "vectory", "Vecto
 ValueNode_VectorY::ValueNode_VectorY(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	if (value.get_type() == type_real)
 		set_link("vector",ValueNode_Const::create(Vector(0, value.get(Real()))));
 	else
@@ -88,8 +87,8 @@ ValueNode_VectorY::~ValueNode_VectorY()
 ValueBase
 ValueNode_VectorY::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	return (*vector_)(t).get(Vector())[1];
 }
@@ -133,7 +132,7 @@ ValueNode_VectorY::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"vector")
+	ret.push_back(ParamDesc("vector")
 		.set_local_name(_("Vector"))
 		.set_description(_("The vector where the Y coordinate is extracted from"))
 	);

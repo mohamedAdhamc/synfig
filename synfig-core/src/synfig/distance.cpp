@@ -33,8 +33,6 @@
 #	include <config.h>
 #endif
 
-#include <ETL/stringf>
-
 #include "distance.h"
 #include "renddesc.h"
 #include "general.h"
@@ -44,7 +42,6 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 
 /* === M A C R O S ========================================================= */
@@ -115,10 +112,8 @@ Distance::operator=(const synfig::String& str)
 synfig::String
 Distance::get_string(int digits)const
 {
-	digits=std::min(9, std::max(0,digits));
-	String fmt(strprintf("%%.%01df",digits));
-	String str(strprintf(fmt.c_str(),value_));
-	return strprintf("%s%s",str.c_str(),system_name(system_).c_str());
+	digits=synfig::clamp(digits,0,9);
+	return synfig::float_presentation(value_, digits) + system_name(system_);
 }
 
 void
@@ -126,6 +121,15 @@ Distance::convert(Distance::System target, const RendDesc& rend_desc)
 {
 	value_=get(target,rend_desc);
 	system_=target;
+}
+
+Distance
+Distance::as(System target, const RendDesc& rend_desc) const
+{
+	Distance d;
+	d.value_ = get(target, rend_desc);
+	d.system_ = target;
+	return d;
 }
 
 Real
@@ -200,10 +204,11 @@ Distance::ident_system(const synfig::String& x)
 	synfig::String str;
 
 	// Make it all upper case, and remove white space
-	for(unsigned int i=0;i<x.size();i++)if(x[i]!=' ' && x[i]!='\t')str+=toupper(x[i]);
+	str = synfig::trim(x);
+	synfig::strtoupper(str);
 
 	// If it is plural, make it singular
-	if(str[str.size()-1]=='S')
+	if(!str.empty() && str.back()=='S')
 		str=synfig::String(str.begin(),str.end()-1);
 
 	if(str.empty() || str=="U" || str=="UNIT")

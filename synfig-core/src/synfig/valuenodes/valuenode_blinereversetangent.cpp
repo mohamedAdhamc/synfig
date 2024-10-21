@@ -42,8 +42,6 @@
 #include <synfig/localization.h>
 #include <synfig/valuenode_registry.h>
 #include <synfig/exception.h>
-#include <ETL/hermite>
-#include <ETL/calculus>
 
 #endif
 
@@ -55,7 +53,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_BLineRevTangent, RELEASE_VERSION_0_61_08, "blinerevtangent", "Reverse Tangent")
+REGISTER_VALUENODE(ValueNode_BLineRevTangent, RELEASE_VERSION_0_61_08, "blinerevtangent", N_("Reverse Tangent"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -64,13 +62,13 @@ REGISTER_VALUENODE(ValueNode_BLineRevTangent, RELEASE_VERSION_0_61_08, "blinerev
 ValueNode_BLineRevTangent::ValueNode_BLineRevTangent(Type &x):
 	LinkableValueNode(x)
 {
+	init_children_vocab();
 }
 
 ValueNode_BLineRevTangent::ValueNode_BLineRevTangent(const ValueNode::Handle &x):
 	LinkableValueNode(x->get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	if(x->get_type()!=type_bline_point)
 		throw Exception::BadType(x->get_type().description.local_name);
 
@@ -98,8 +96,8 @@ ValueNode_BLineRevTangent::~ValueNode_BLineRevTangent()
 ValueBase
 ValueNode_BLineRevTangent::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	if ((*reverse_)(t).get(bool()))
 	{
@@ -155,12 +153,12 @@ ValueNode_BLineRevTangent::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"reference")
+	ret.push_back(ParamDesc("reference")
 		.set_local_name(_("Reference"))
 		.set_description(_("The referenced tangent to reverse"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"reverse")
+	ret.push_back(ParamDesc("reverse")
 		.set_local_name(_("Reverse"))
 		.set_description(_("When checked, the reference is reversed"))
 	);

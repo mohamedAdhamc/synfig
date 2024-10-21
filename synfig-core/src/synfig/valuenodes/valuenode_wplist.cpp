@@ -34,7 +34,6 @@
 #endif
 
 #include "valuenode_wplist.h"
-#include "valuenode_const.h"
 #include "valuenode_composite.h"
 #include "valuenode_bline.h"
 #include <synfig/general.h>
@@ -42,8 +41,6 @@
 #include <synfig/valuenode_registry.h>
 #include <synfig/exception.h>
 #include <synfig/widthpoint.h>
-
-#include <ETL/stringf>
 
 #include <vector>
 #include <list>
@@ -58,7 +55,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_WPList, RELEASE_VERSION_0_63_00, "wplist", "WPList")
+REGISTER_VALUENODE(ValueNode_WPList, RELEASE_VERSION_0_63_00, "wplist", N_("WPList"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -225,7 +222,7 @@ ValueNode_WPList::create(const ValueBase& value, etl::loose_handle<Canvas>)
 {
 	// if the parameter is not a list type, return null
 	if(value.get_type()!=type_list)
-		return NULL;
+		return nullptr;
 	// create an empty list
 	ValueNode_WPList* value_node(new ValueNode_WPList());
 	// If the value parameter is not empty
@@ -246,7 +243,7 @@ ValueNode_WPList::create(const ValueBase& value, etl::loose_handle<Canvas>)
 		{
 			// We got a list of who-knows-what. We don't have any idea
 			// what to do with it.
-			return NULL;
+			return nullptr;
 		}
 	}
 
@@ -284,8 +281,8 @@ ValueNode_WPList::create_list_entry(int index, Time time, Real /*origin*/)
 ValueBase
 ValueNode_WPList::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	std::vector<WidthPoint> ret_list;
 
@@ -350,7 +347,7 @@ String
 ValueNode_WPList::link_local_name(int i)const
 {
 	assert(i>=0 && (unsigned)i<list.size());
-	return etl::strprintf(_("WidthPoint %03d"),i+1);
+	return strprintf(_("WidthPoint %03d"),i+1);
 }
 
 

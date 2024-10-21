@@ -51,7 +51,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_And, RELEASE_VERSION_0_62_00, "and", "AND")
+REGISTER_VALUENODE(ValueNode_And, RELEASE_VERSION_0_62_00, "and", N_("AND"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -60,8 +60,7 @@ REGISTER_VALUENODE(ValueNode_And, RELEASE_VERSION_0_62_00, "and", "AND")
 ValueNode_And::ValueNode_And(const ValueBase &x):
 	LinkableValueNode(x.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	bool value(x.get(bool()));
 
 	set_link("link1",        ValueNode_Const::create(bool(true)));
@@ -113,8 +112,8 @@ ValueNode_And::get_link_vfunc(int i)const
 ValueBase
 ValueNode_And::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	bool link1     = (*link1_)   (t).get(bool());
 	bool link2     = (*link2_)   (t).get(bool());
@@ -138,12 +137,12 @@ ValueNode_And::get_children_vocab_vfunc() const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"link1")
+	ret.push_back(ParamDesc("link1")
 		.set_local_name(_("Link1"))
 		.set_description(_("First operand of the AND operation"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"link2")
+	ret.push_back(ParamDesc("link2")
 		.set_local_name(_("Link2"))
 		.set_description(_("Second operand of the AND operation"))
 	);

@@ -35,10 +35,10 @@
 
 #include <glib/gstdio.h>
 #include "trgt_yuv.h"
+
 #endif
 
 using namespace synfig;
-using namespace etl;
 
 /* === M A C R O S ========================================================= */
 
@@ -59,9 +59,9 @@ SYNFIG_TARGET_SET_VERSION(yuv,"0.1");
 
 /* === M E T H O D S ======================================================= */
 
-yuv::yuv(const char *FILENAME, const synfig::TargetParam& /* params */):
+yuv::yuv(const synfig::filesystem::Path& FILENAME, const synfig::TargetParam& /* params */):
 	filename(FILENAME),
-	file( (filename=="-")?stdout:g_fopen(filename.c_str(),POPEN_BINARY_WRITE_TYPE) ),
+	file( filename.u8string() == "-" ? stdout : SmartFILE(filename, "wb") ),
 	dithering(true)
 {
 	// YUV420P doesn't have an alpha channel
@@ -136,7 +136,7 @@ yuv::end_frame()
 			Color& c(surface[y][x]);
 			c=c.clamped();
 			float f(c.get_y());
-			int i(std::max(std::min(round_to_int(c.get_y()*Y_RANGE),Y_RANGE),0)+Y_FLOOR);
+			int i(synfig::clamp(round_to_int(c.get_y()*Y_RANGE),0, Y_RANGE)+Y_FLOOR);
 
 			if(dithering)
 			{
@@ -178,7 +178,7 @@ yuv::end_frame()
 		{
 			const Color& c(sm_surface[y][x]);
 			const float f(c.get_u());
-			const int i(std::max(std::min(round_to_int((f+0.5f)*UV_RANGE),UV_RANGE),0)+UV_FLOOR);
+			const int i(synfig::clamp(round_to_int((f+0.5f)*UV_RANGE), 0, UV_RANGE)+UV_FLOOR);
 
 			if(dithering)
 			{
@@ -204,7 +204,7 @@ yuv::end_frame()
 		{
 			const Color& c(sm_surface[y][x]);
 			const float f(c.get_v());
-			const int i(std::max(std::min(round_to_int((f+0.5f)*UV_RANGE),UV_RANGE),0)+UV_FLOOR);
+			const int i(synfig::clamp(round_to_int((f+0.5f)*UV_RANGE), 0, UV_RANGE)+UV_FLOOR);
 
 			if(dithering)
 			{

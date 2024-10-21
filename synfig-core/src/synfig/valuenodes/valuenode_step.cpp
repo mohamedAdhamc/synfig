@@ -40,7 +40,6 @@
 #include <synfig/valuenode_registry.h>
 #include <synfig/color.h>
 #include <synfig/vector.h>
-#include <ETL/misc>
 #endif
 
 /* === U S I N G =========================================================== */
@@ -51,7 +50,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Step, RELEASE_VERSION_0_61_08, "step", "Step")
+REGISTER_VALUENODE(ValueNode_Step, RELEASE_VERSION_0_61_08, "step", N_("Step"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -60,8 +59,7 @@ REGISTER_VALUENODE(ValueNode_Step, RELEASE_VERSION_0_61_08, "step", "Step")
 ValueNode_Step::ValueNode_Step(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	set_link("duration",     ValueNode_Const::create(Time(1)));
 	set_link("start_time",   ValueNode_Const::create(Time(0)));
 	set_link("intersection", ValueNode_Const::create(Real(0.5)));
@@ -108,8 +106,8 @@ ValueNode_Step::~ValueNode_Step()
 ValueBase
 ValueNode_Step::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	Time duration    ((*duration_    )(t).get(Time()));
 	Time start_time  ((*start_time_  )(t).get(Time()));
@@ -183,22 +181,22 @@ ValueNode_Step::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"link")
+	ret.push_back(ParamDesc("link")
 		.set_local_name(_("Link"))
 		.set_description(_("The value node used to make the step"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"duration")
+	ret.push_back(ParamDesc("duration")
 		.set_local_name(_("Duration"))
 		.set_description(_("The duration of the step"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"start_time")
+	ret.push_back(ParamDesc("start_time")
 		.set_local_name(_("Start Time"))
 		.set_description(_("The time when the step conversion starts"))
 	);
 
-		ret.push_back(ParamDesc(ValueBase(),"intersection")
+		ret.push_back(ParamDesc("intersection")
 		.set_local_name(_("Intersection"))
 		.set_description(_("Value that define whether the step is centered on the value [0,1]"))
 	);

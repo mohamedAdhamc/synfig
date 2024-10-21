@@ -60,9 +60,8 @@ using namespace studio;
 Widget_Filename::Widget_Filename()
 {
 	entry_filename=manage(new Gtk::Entry());
-	icon_browse = manage(new Gtk::Image(Gtk::StockID("synfig-open"), Gtk::ICON_SIZE_SMALL_TOOLBAR));
 	button_choose=manage(new Gtk::Button());
-	button_choose->add(*icon_browse);
+	button_choose->set_image_from_icon_name("action_doc_open_icon");
 
 	set_hexpand(true);
 	entry_filename->set_hexpand(true);
@@ -72,7 +71,6 @@ Widget_Filename::Widget_Filename()
 
 	entry_filename->show();
 	button_choose->show();
-	icon_browse->show();
 
 	button_choose->signal_clicked().connect(sigc::mem_fun(*this, &studio::Widget_Filename::on_button_choose_pressed));
 	//entry_filename->signal_value_changed().connect(sigc::mem_fun(*this, &studio::Widget_Filename::on_value_changed));
@@ -118,15 +116,14 @@ Widget_Filename::on_value_changed()
 void
 Widget_Filename::on_button_choose_pressed()
 {
-	std::string filename=entry_filename->get_text();
-	filename = synfig::CanvasFileNaming::make_full_filename(canvas->get_file_name(), filename);
+	synfig::filesystem::Path filename(entry_filename->get_text());
+	filename = synfig::CanvasFileNaming::make_full_filename(canvas->get_file_name(), filename.u8string());
 
 	if(filename.empty())
-		filename=".";
+		filename = synfig::filesystem::Path(".");
 	else
-		filename = etl::absolute_path(
-			etl::dirname(App::get_selected_canvas_view()->get_canvas()->get_file_name()) +
-			ETL_DIRECTORY_SEPARATOR +
+		filename = synfig::filesystem::absolute(
+			synfig::filesystem::Path(App::get_selected_canvas_view()->get_canvas()->get_file_name()).parent_path() /
 			filename);
 
 	synfig::Layer::Handle layer(App::get_selected_canvas_view()->get_selection_manager()->get_selected_layer());
@@ -145,8 +142,8 @@ Widget_Filename::on_button_choose_pressed()
 
 	if (selected)
 	{
-		filename = synfig::CanvasFileNaming::make_short_filename(canvas->get_file_name(), filename);
-		entry_filename->set_text(filename);
+		filename = synfig::CanvasFileNaming::make_short_filename(canvas->get_file_name(), filename.u8string());
+		entry_filename->set_text(filename.u8string());
 		entry_filename->activate();
 	}
 }

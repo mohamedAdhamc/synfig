@@ -34,13 +34,12 @@
 
 #include <gui/widgets/widget_enum.h>
 
-#include <ETL/stringf>
+#include <synfig/string_helper.h>
 
 #endif
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 using namespace studio;
 
@@ -59,7 +58,12 @@ Widget_Enum::Widget_Enum():
 
 	enum_TreeModel = Gtk::ListStore::create(enum_model);
 	set_model(enum_TreeModel);
-	pack_start(enum_model.icon, false);
+
+	Gtk::CellRendererPixbuf* pixbuf_cell_renderer = manage(new Gtk::CellRendererPixbuf());
+
+	pack_start(*pixbuf_cell_renderer, true);
+	add_attribute(pixbuf_cell_renderer->property_icon_name(), enum_model.icon_name);
+
 	pack_start(enum_model.local_name, true);
 	this->set_wrap_width(1); // https://github.com/synfig/synfig/issues/650
 
@@ -75,29 +79,28 @@ void
 Widget_Enum::set_param_desc(const synfig::ParamDesc &x)
 {
 	param_desc=x;
-	// First clear the current items in the ComobBox
+	// First clear the current items in the ComboBox
 	enum_TreeModel->clear();
 	std::list<synfig::ParamDesc::EnumData> enum_list=param_desc.get_enum_list();
 	std::list<synfig::ParamDesc::EnumData>::iterator iter;
 	// Fill the combo with the values
-	for(iter=enum_list.begin();iter!=enum_list.end();iter++)
-		{
-			Gtk::TreeModel::Row row = *(enum_TreeModel->append());
-			row[enum_model.value] = iter->value;
-			row[enum_model.local_name] = iter->local_name;
-		}
+	for (iter = enum_list.begin(); iter != enum_list.end(); ++iter) {
+		Gtk::TreeModel::Row row = *(enum_TreeModel->append());
+		row[enum_model.value] = iter->value;
+		row[enum_model.local_name] = iter->local_name;
+	}
 	refresh();
 }
 
 void
-Widget_Enum::set_icon(Gtk::TreeNodeChildren::size_type index, const Glib::RefPtr<Gdk::Pixbuf> &icon)
+Widget_Enum::set_icon(Gtk::TreeNodeChildren::size_type index, const std::string& icon_name)
 {
 	// check if the index is valid
 	if(index > enum_TreeModel->children().size()-1 )
 		return;
 	Glib::ustring path(strprintf("%d", index).c_str());
 	Gtk::TreeModel::Row row = *(enum_TreeModel->get_iter(path));
-	row[enum_model.icon]=icon;
+	row[enum_model.icon_name] = icon_name;
 }
 
 void
@@ -105,7 +108,7 @@ Widget_Enum::refresh()
 {
 	typedef Gtk::TreeModel::Children type_children;
 	type_children children = enum_TreeModel->children();
-	for(type_children::iterator iter = children.begin();
+	for (type_children::iterator iter = children.begin();
 		iter != children.end(); ++iter)
 	{
 		Gtk::TreeModel::Row row = *iter;

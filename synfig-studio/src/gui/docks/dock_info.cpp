@@ -44,7 +44,6 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 
 /* === M A C R O S ========================================================= */
@@ -59,7 +58,7 @@ using namespace synfig;
 
 void studio::Dock_Info::on_mouse_move()
 {
-	etl::loose_handle<CanvasView> canvas_view(get_canvas_view());
+	CanvasView::LooseHandle canvas_view(get_canvas_view());
 	if(!canvas_view) return;
 	Point pos = canvas_view->get_work_area()->get_cursor_pos();
 
@@ -103,10 +102,10 @@ studio::Dock_Info::Dock_Info()
 
 	// X and Y position labels
 	Gtk::Label *x_label = manage(new Gtk::Label());
-	x_label->set_markup(etl::strprintf("<b>%s</b>", _("X: ")));
+	x_label->set_markup(synfig::strprintf("<b>%s</b>", _("X: ")));
 	x_label->set_hexpand(false);
 	Gtk::Label *y_label = manage(new Gtk::Label());
-	y_label->set_markup(etl::strprintf("<b>%s</b>", _("Y: ")));
+	y_label->set_markup(synfig::strprintf("<b>%s</b>", _("Y: ")));
 	y_label->set_hexpand(false);
 	grid->attach(*x_label, 0, 0, 1, 1);
 	grid->attach(*y_label, 0, 1, 1, 1);
@@ -124,16 +123,16 @@ studio::Dock_Info::Dock_Info()
 
 	// Color labels
 	Gtk::Label *r_label = manage(new Gtk::Label());
-	r_label->set_markup(etl::strprintf("<b>%s</b>", _("R: ")));
+	r_label->set_markup(synfig::strprintf("<b>%s</b>", _("R: ")));
 	r_label->set_hexpand(false);
 	Gtk::Label *g_label = manage(new Gtk::Label());
-	g_label->set_markup(etl::strprintf("<b>%s</b>", _("G: ")));
+	g_label->set_markup(synfig::strprintf("<b>%s</b>", _("G: ")));
 	g_label->set_hexpand(false);
 	Gtk::Label *b_label = manage(new Gtk::Label());
-	b_label->set_markup(etl::strprintf("<b>%s</b>", _("B: ")));
+	b_label->set_markup(synfig::strprintf("<b>%s</b>", _("B: ")));
 	b_label->set_hexpand(false);
 	Gtk::Label *a_label = manage(new Gtk::Label());
-	a_label->set_markup(etl::strprintf("<b>%s</b>", _("A: ")));
+	a_label->set_markup(synfig::strprintf("<b>%s</b>", _("A: ")));
 	a_label->set_hexpand(false);
 	grid->attach(*r_label, 3, 0, 1, 1);
 	grid->attach(*g_label, 3, 1, 1, 1);
@@ -162,7 +161,7 @@ studio::Dock_Info::Dock_Info()
 	Gtk::Label *render_progress_label = manage(new Gtk::Label());
 	Gtk::Overlay *overlay = manage(new Gtk::Overlay());
 
-	render_progress_label->set_markup(etl::strprintf("<b>%s</b>", _("Render Progress:")));
+	render_progress_label->set_markup(synfig::strprintf("<b>%s</b>", _("Render Progress:")));
 
 	// Render progress CSS ID
 	render_progress.set_name("render-progress");
@@ -218,7 +217,7 @@ void studio::Dock_Info::on_stop_button_clicked()
 		async_renderer->stop(studio::AsyncRenderer::INTERACTION_BY_USER);
 }
 
-void studio::Dock_Info::changed_canvas_view_vfunc(etl::loose_handle<CanvasView> canvas_view)
+void studio::Dock_Info::changed_canvas_view_vfunc(CanvasView::LooseHandle canvas_view)
 {
 	mousecon.disconnect();
 

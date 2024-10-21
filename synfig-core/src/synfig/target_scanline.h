@@ -54,6 +54,8 @@ class Target_Scanline : public Target
 
 	String engine_;
 
+	int pixel_rendering_limit_;
+
 	bool call_renderer(
 		const etl::handle<rendering::SurfaceResource> &surface,
 		Canvas &canvas,
@@ -68,13 +70,13 @@ public:
 	Target_Scanline();
 
 	//! Renders the canvas to the target
-	virtual bool render(ProgressCallback *cb=NULL);
+	virtual bool render(ProgressCallback* cb = nullptr);
 
 	//! Marks the start of a frame
 	/*! \return \c true on success, \c false upon an error.
 	**	\see end_frame(), start_scanline()
 	*/
-	virtual bool start_frame(ProgressCallback *cb=NULL)=0;
+	virtual bool start_frame(ProgressCallback* cb = nullptr) = 0;
 	
 	//! Returns the number of peniding frames to render. If it is zero it
 	//! stops rendering frames.
@@ -100,8 +102,8 @@ public:
 	**	\see start_scanline()
 	*/
 	virtual bool end_scanline()=0;
-	//! Sets the number of threads
 
+	//! Sets the number of threads
 	void set_threads(int x) { threads_=x; }
 	//! Gets the number of threads
 	int get_threads()const { return threads_; }
@@ -110,9 +112,19 @@ public:
 	//! Sets engine
 	void set_engine(const String &x) { engine_=x; }
 
+	/**
+	 * Sets the loose limit of pixels to render.
+	 *
+	 * It's actually internally rounded to fill a full row according to RendDesc
+	 */
+	void set_pixel_rendering_limit(int x) { pixel_rendering_limit_ = x; }
+	/** Get the loose limit of pixels to render. @see set_pixel_rendering_limit() */
+	int get_pixel_rendering_limit() const { return pixel_rendering_limit_; }
+
 	//! Puts the rendered surface onto the target.
 	bool add_frame(const synfig::Surface *surface, ProgressCallback* cb);
 private:
+	bool process_block_alpha(const synfig::Surface& surface, int width, int height, int yOffset, ProgressCallback* cb);
 }; // END of class Target_Scanline
 
 }; // END of namespace synfig

@@ -53,7 +53,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Repeat_Gradient, RELEASE_VERSION_0_61_07, "repeat_gradient", "Repeat Gradient")
+REGISTER_VALUENODE(ValueNode_Repeat_Gradient, RELEASE_VERSION_0_61_07, "repeat_gradient", N_("Repeat Gradient"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -61,8 +61,7 @@ REGISTER_VALUENODE(ValueNode_Repeat_Gradient, RELEASE_VERSION_0_61_07, "repeat_g
 
 synfig::ValueNode_Repeat_Gradient::ValueNode_Repeat_Gradient(const Gradient& x):LinkableValueNode(synfig::type_gradient)
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	set_link("gradient",ValueNode_Const::create(x));
 	set_link("count",count_=ValueNode_Const::create(int(3)));
 	set_link("width",ValueNode_Const::create(0.5));
@@ -104,8 +103,8 @@ synfig::ValueNode_Repeat_Gradient::~ValueNode_Repeat_Gradient()
 synfig::ValueBase
 synfig::ValueNode_Repeat_Gradient::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	const int count((*count_)(t).get(int()));
 	int i;
@@ -115,7 +114,7 @@ synfig::ValueNode_Repeat_Gradient::operator()(Time t)const
 		return ret;
 
 	const Gradient gradient((*gradient_)(t).get(Gradient()));
-	const float width(std::max(0.0, std::min(1.0,(*width_)(t).get(Real()))));
+	const float width(synfig::clamp((*width_)(t).get(Real()), 0.0, 1.0));
 	const bool specify_start((*specify_start_)(t).get(bool()));
 	const bool specify_end((*specify_end_)(t).get(bool()));
 
@@ -194,37 +193,37 @@ ValueNode_Repeat_Gradient::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"gradient")
+	ret.push_back(ParamDesc("gradient")
 		.set_local_name(_("Gradient"))
 		.set_description(_("The source gradient to repeat"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"count")
+	ret.push_back(ParamDesc("count")
 		.set_local_name(_("Count"))
 		.set_description(_("The number of repetition of the gradient"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"width")
+	ret.push_back(ParamDesc("width")
 		.set_local_name(_("Width"))
 		.set_description(_("Specifies how much biased is the source gradient in the repetition [0,1]"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"specify_start")
+	ret.push_back(ParamDesc("specify_start")
 		.set_local_name(_("Specify Start"))
 		.set_description(_("When checked, 'Start Color' is used as the start of the resulting gradient"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"specify_end")
+	ret.push_back(ParamDesc("specify_end")
 		.set_local_name(_("Specify End"))
 		.set_description(_("When checked, 'End Color' is used as the start of the resulting gradient"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"start_color")
+	ret.push_back(ParamDesc("start_color")
 		.set_local_name(_("Start Color"))
 		.set_description(_("Used as the start of the resulting gradient"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"end_color")
+	ret.push_back(ParamDesc("end_color")
 		.set_local_name(_("End Color"))
 		.set_description(_("Used as the end of the resulting gradient"))
 	);

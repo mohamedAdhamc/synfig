@@ -35,13 +35,13 @@
 
 #include <gui/widgets/widget_gradient.h>
 
-#include <ETL/misc>
-
 #include <gtkmm/menu.h>
 
 #include <gui/app.h>
 #include <gui/exception_guard.h>
 #include <gui/localization.h>
+
+#include <synfig/misc.h>
 
 #endif
 
@@ -67,9 +67,7 @@ studio::render_gradient_to_window(const Cairo::RefPtr<Cairo::Context>& cr,const 
 	Cairo::RefPtr<Cairo::LinearGradient> gpattern = Cairo::LinearGradient::create(ca.get_x(), ca.get_y(), ca.get_x()+width, ca.get_y());
 	double a, r, g, b;
 	Gradient::CPoint cp;
-	Gradient::const_iterator iter;
-	for(iter=gradient.begin();iter!=gradient.end(); iter++)
-	{
+	for (Gradient::const_iterator iter = gradient.begin(); iter != gradient.end(); ++iter) {
 		cp=*iter;
 		a=cp.color.get_a();
 		r=cp.color.get_r();
@@ -130,10 +128,9 @@ Widget_Gradient::on_draw(const ::Cairo::RefPtr< ::Cairo::Context>& cr)
 
 	render_gradient_to_window(cr,Gdk::Rectangle(0,0,w,h),gradient_);
 
-	Gradient::iterator iter,selected_iter;
+	Gradient::iterator selected_iter;
 	bool show_selected(false);
-	for(iter=gradient_.begin();iter!=gradient_.end();iter++)
-	{
+	for (Gradient::iterator iter = gradient_.begin(); iter != gradient_.end(); ++iter) {
 		if(*iter!=selected_cpoint)
 		{
 			get_style_context()->render_arrow(
@@ -161,14 +158,14 @@ Widget_Gradient::on_draw(const ::Cairo::RefPtr< ::Cairo::Context>& cr)
 		get_style_context()->render_arrow(
 			cr,
 			1.5*M_PI,
-			etl::round_to_int(selected_iter->pos*w)-CONTROL_HEIGHT/2+1,
+			synfig::round_to_int(selected_iter->pos*w)-CONTROL_HEIGHT/2+1,
 			h-CONTROL_HEIGHT,
 			CONTROL_HEIGHT
 		);
 		get_style_context()->render_arrow(
 			cr,
 			1.5*M_PI,
-			etl::round_to_int(selected_iter->pos*w)-CONTROL_HEIGHT/2+1,
+			synfig::round_to_int(selected_iter->pos*w)-CONTROL_HEIGHT/2+1,
 			h-CONTROL_HEIGHT*1.3,
 			CONTROL_HEIGHT
 		);
@@ -208,7 +205,7 @@ Widget_Gradient::popup_menu(float x)
 	for(std::vector<Gtk::Widget*>::iterator i = children.begin(); i != children.end(); ++i)
 		menu->remove(**i);
 
-	Gtk::MenuItem *item = NULL;
+	Gtk::MenuItem* item = nullptr;
 
 	item = manage(new Gtk::MenuItem(_("Insert Color Stop")));
 	item->signal_activate().connect(
@@ -286,10 +283,10 @@ Widget_Gradient::on_event(GdkEvent *event)
 				{
 					float begin(-100000000),end(100000000);
 					Gradient::iterator before(iter),after(iter);
-					after++;
+					++after;
 					if(iter!=gradient_.begin())
 					{
-						before--;
+						--before;
 						begin=before->pos;
 					}
 					if(after!=gradient_.end())

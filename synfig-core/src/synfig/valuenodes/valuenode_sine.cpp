@@ -50,7 +50,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Sine, RELEASE_VERSION_0_61_06, "sine", "Sine")
+REGISTER_VALUENODE(ValueNode_Sine, RELEASE_VERSION_0_61_06, "sine", N_("Sine"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -59,8 +59,7 @@ REGISTER_VALUENODE(ValueNode_Sine, RELEASE_VERSION_0_61_06, "sine", "Sine")
 ValueNode_Sine::ValueNode_Sine(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	if (value.get_type() == type_real)
 	{
 		set_link("angle",ValueNode_Const::create(Angle::deg(90)));
@@ -92,8 +91,8 @@ ValueNode_Sine::~ValueNode_Sine()
 ValueBase
 ValueNode_Sine::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	return
 		Angle::sin(
@@ -145,12 +144,12 @@ ValueNode_Sine::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"angle")
+	ret.push_back(ParamDesc("angle")
 		.set_local_name(_("Angle"))
 		.set_description(_("The angle where the sine is calculated from"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"amp")
+	ret.push_back(ParamDesc("amp")
 		.set_local_name(_("Amplitude"))
 		.set_description(_("The value that multiplies the resulting sine"))
 	);

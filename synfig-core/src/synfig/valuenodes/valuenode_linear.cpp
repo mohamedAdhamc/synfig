@@ -39,24 +39,22 @@
 
 #include <synfig/general.h>
 #include <synfig/localization.h>
+#include <synfig/misc.h>
 #include <synfig/valuenode_registry.h>
 #include <synfig/color.h>
 #include <synfig/vector.h>
-
-#include <ETL/misc>
 
 #endif
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 
 /* === M A C R O S ========================================================= */
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Linear, RELEASE_VERSION_0_61_06, "linear", "Linear")
+REGISTER_VALUENODE(ValueNode_Linear, RELEASE_VERSION_0_61_06, "linear", N_("Linear"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -65,8 +63,7 @@ REGISTER_VALUENODE(ValueNode_Linear, RELEASE_VERSION_0_61_06, "linear", "Linear"
 ValueNode_Linear::ValueNode_Linear(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	Type &type(get_type());
 	if (type == type_angle)
 	{
@@ -129,8 +126,8 @@ ValueNode_Linear::~ValueNode_Linear()
 ValueBase
 ValueNode_Linear::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	Type &type(get_type());
 	if (type == type_angle)
@@ -200,20 +197,20 @@ ValueNode_Linear::get_children_vocab_vfunc()const
 	 || type == type_real
 	 || type == type_time)
 	{
-		ret.push_back(ParamDesc(ValueBase(),"slope")
+		ret.push_back(ParamDesc("slope")
 			.set_local_name(_("Rate"))
 			.set_description(_("Value that is multiplied by the current time (in seconds)"))
 		);
 	}
 	else
 	{
-		ret.push_back(ParamDesc(ValueBase(),"slope")
+		ret.push_back(ParamDesc("slope")
 			.set_local_name(_("Slope"))
 			.set_description(_("Value that is multiplied by the current time (in seconds)"))
 		);
 	}
 
-	ret.push_back(ParamDesc(ValueBase(),"offset")
+	ret.push_back(ParamDesc("offset")
 		.set_local_name(_("Offset"))
 		.set_description(_("Returned value when the current time is zero"))
 	);

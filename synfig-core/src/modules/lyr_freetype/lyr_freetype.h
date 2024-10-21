@@ -134,6 +134,7 @@ private:
 	bool new_face(const synfig::String &newfont);
 
 	static std::vector<std::string> get_possible_font_directories(const std::string& canvas_path);
+	static std::vector<std::string> get_possible_font_files(const std::string& newfont, const synfig::filesystem::Path& canvas_path);
 
 	void on_param_text_changed();
 
@@ -147,7 +148,7 @@ private:
 	synfig::Point contour_to_world(const synfig::Point& p) const;
 
 	enum SyncFlags {
-		SYNC_FONT,
+		SYNC_FONT = 1,
 		SYNC_TEXT,
 		SYNC_DIRECTION,
 		SYNC_COMPRESS,

@@ -32,10 +32,12 @@
 #	include <config.h>
 #endif
 
-#include "curve_helper.h"
 #include "curveset.h"
+
+#include <synfig/bezier.h>
 #include "blinepoint.h"
-#include <ETL/bezier>
+#include "curve_helper.h"
+
 #include <vector>
 #include <list>
 #include <set>
@@ -44,7 +46,6 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 
 /* === M A C R O S ========================================================= */
@@ -68,10 +69,9 @@ CurvePoint::CurvePoint(const Point &pin, const Vector &left, const Vector &right
 {
 }
 
-CurvePoint::CurvePoint(const BLinePoint &bpoint)
+CurvePoint::CurvePoint(const BLinePoint& bpoint)
+	: p(bpoint.get_vertex())
 {
-	p = bpoint.get_vertex();
-
 	l = p + bpoint.get_tangent1()*(1/3.0f);
 	r = p + bpoint.get_tangent2()*(1/3.0f);
 }
@@ -96,7 +96,7 @@ struct ipoint
 	{
 		next = this;
 		prev = this;
-		neighbor = NULL;
+		neighbor = nullptr;
 	}
 
 	bool operator<(const ipoint &rhs) const

@@ -51,7 +51,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_VectorAngle, RELEASE_VERSION_0_61_09, "vectorangle", "Vector Angle")
+REGISTER_VALUENODE(ValueNode_VectorAngle, RELEASE_VERSION_0_61_09, "vectorangle", N_("Vector Angle"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -60,8 +60,7 @@ REGISTER_VALUENODE(ValueNode_VectorAngle, RELEASE_VERSION_0_61_09, "vectorangle"
 ValueNode_VectorAngle::ValueNode_VectorAngle(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	if (value.get_type() == type_angle)
 		set_link("vector",ValueNode_Const::create(Vector(Angle::cos(value.get(Angle())).get(),
 														 Angle::sin(value.get(Angle())).get())));
@@ -89,8 +88,8 @@ ValueNode_VectorAngle::~ValueNode_VectorAngle()
 ValueBase
 ValueNode_VectorAngle::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	return (*vector_)(t).get(Vector()).angle();
 }
@@ -135,7 +134,7 @@ ValueNode_VectorAngle::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"vector")
+	ret.push_back(ParamDesc("vector")
 		.set_local_name(_("Vector"))
 		.set_description(_("The vector where the angle is calculated from"))
 	);

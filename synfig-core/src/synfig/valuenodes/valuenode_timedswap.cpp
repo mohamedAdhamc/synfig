@@ -41,22 +41,20 @@
 #include "valuenode_const.h"
 #include <stdexcept>
 #include <synfig/color.h>
+#include <synfig/misc.h>
 #include <synfig/vector.h>
-
-#include <ETL/misc>
 
 #endif
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 
 /* === M A C R O S ========================================================= */
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_TimedSwap, RELEASE_VERSION_0_61_07, "timed_swap", "Timed Swap")
+REGISTER_VALUENODE(ValueNode_TimedSwap, RELEASE_VERSION_0_61_07, "timed_swap", N_("Timed Swap"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -65,8 +63,7 @@ REGISTER_VALUENODE(ValueNode_TimedSwap, RELEASE_VERSION_0_61_07, "timed_swap", "
 ValueNode_TimedSwap::ValueNode_TimedSwap(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	Type &type(get_type());
 	if (type == type_angle)
 	{
@@ -132,8 +129,8 @@ synfig::ValueNode_TimedSwap::~ValueNode_TimedSwap()
 synfig::ValueBase
 synfig::ValueNode_TimedSwap::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	Time swptime=(*swap_time)(t).get(Time());
 	Time swplength=(*swap_length)(t).get(Time());
@@ -251,22 +248,22 @@ ValueNode_TimedSwap::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"before")
+	ret.push_back(ParamDesc("before")
 		.set_local_name(_("Before"))
 		.set_description(_("The value node returned when current time is before 'time' - 'length'"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"after")
+	ret.push_back(ParamDesc("after")
 		.set_local_name(_("After"))
 		.set_description(_("The value node returned when current time is after 'time'"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"time")
+	ret.push_back(ParamDesc("time")
 		.set_local_name(_("Time"))
 		.set_description(_("The time when the linear interpolation ends"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"length")
+	ret.push_back(ParamDesc("length")
 		.set_local_name(_("Length"))
 		.set_description(_("The length of time when the linear interpolation between 'Before' and 'After' is made"))
 	);

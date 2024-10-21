@@ -67,7 +67,7 @@ const int fullheight = 20;
 static void
 calc_divisions(float fps, double range, double sub_range, double &out_step, int &out_subdivisions)
 {
-	int ifps = etl::round_to_int(fps);
+	int ifps = synfig::round_to_int(fps);
 	if (ifps < 1) ifps = 1;
 
 	// build a list of all the factors of the frame rate
@@ -104,17 +104,19 @@ calc_divisions(float fps, double range, double sub_range, double &out_step, int 
 	// find most ideal scale
 	double scale;
 	{
-		std::vector<double>::iterator next = etl::binary_find(ranges.begin(), ranges.end(), mid_range);
+		std::vector<double>::iterator next = synfig::binary_find(ranges.begin(), ranges.end(), mid_range);
 		std::vector<double>::iterator iter = next++;
-		if (iter == ranges.end()) iter--;
-		if (next == ranges.end()) next--;
+		if (iter == ranges.end())
+			--iter;
+		if (next == ranges.end())
+			--next;
 		if (fabs(*next - mid_range) < fabs(*iter - mid_range))
 			iter = next;
 		scale = *iter;
 	}
 
 	// subdivide into this many tick marks (8 or less)
-	int subdiv = etl::round_to_int(scale * ifps);
+	int subdiv = synfig::round_to_int(scale * ifps);
 	if (subdiv > 8) {
 		const int ideal = subdiv;
 
@@ -284,7 +286,7 @@ Widget_Timeslider::on_draw(const Cairo::RefPtr<Cairo::Context> &cr)
 	cr->restore();
 
 	// Draw the time line
-	Gdk::Cairo::set_source_color(cr, Gdk::Color("#ffaf00"));
+	Gdk::Cairo::set_source_rgba(cr, Gdk::RGBA("#ffaf00"));
 	cr->set_line_width(3.0);
 	double x = time_plot_data->get_pixel_t_coord(time_plot_data->time);
 	cr->move_to(x, 0.0);

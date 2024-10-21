@@ -32,13 +32,11 @@
 #	include <config.h>
 #endif
 
-#include <algorithm> // std::transform
 #include "canvasfilenaming.h"
 
 #include "filecontainerzip.h"
 #include "filesystemnative.h"
 #include "filesystemgroup.h"
-#include "filesystemtemporary.h"
 #include "importer.h"
 
 #endif
@@ -59,22 +57,16 @@ CanvasFileNaming::filename_base(const String &filename)
 	size_t pos;
 	while((pos = base.find(container_prefix)) != String::npos)
 		base.replace(pos, container_prefix.size(), container_directory_separator);
-	return etl::basename(base);
+	return filesystem::Path::basename(base);
 }
 
 String
 CanvasFileNaming::filename_extension_lower(const String &filename)
 {
-	String ext = etl::filename_extension(filename);
+	String ext = filesystem::Path::filename_extension(filename);
 	if (!ext.empty()) ext = ext.substr(1); // skip initial '.'
-	std::transform(ext.begin(), ext.end(), ext.begin(), &::tolower);
+	strtolower(ext);
 	return ext;
-}
-
-String
-CanvasFileNaming::append_directory_separator(const String &path)
-{
-	return path.empty() ? String() : path + container_directory_separator;
 }
 
 String
@@ -97,9 +89,9 @@ String
 CanvasFileNaming::make_short_filename(const String &canvas_filename, const String &filename)
 {
 	if (filename.empty()) return String();
-	String clean_filename = etl::cleanup_path(filename);
+	String clean_filename = filesystem::Path::cleanup_path(filename);
 	if (filename_base(clean_filename).empty())
-		clean_filename = etl::dirname(clean_filename);
+		clean_filename = filesystem::Path::dirname(clean_filename);
 	if (filename_base(clean_filename).empty()) return String();
 
 	// any file inside container accessible without folder:
@@ -110,14 +102,14 @@ CanvasFileNaming::make_short_filename(const String &canvas_filename, const Strin
 			 ? container_prefix + filename_base(clean_filename.substr(container_prefix.size()))
 			 : String();
 
-	if (!etl::is_absolute_path(canvas_filename))
+	if (!filesystem::Path::is_absolute_path(canvas_filename))
 		return clean_filename;
 
-	String canvas_absolute_filename = etl::absolute_path(canvas_filename);
-	String canvas_path = etl::dirname(canvas_absolute_filename);
+	String canvas_absolute_filename = filesystem::Path::absolute_path(canvas_filename);
+	String canvas_path = filesystem::Path::dirname(canvas_absolute_filename);
 	String canvas_basename = filename_base(canvas_absolute_filename);
-	String absolute_filename = etl::absolute_path(canvas_path, clean_filename);
-	String relative_filename = etl::relative_path(canvas_path, absolute_filename);
+	String absolute_filename = filesystem::Path::absolute_path(canvas_path, clean_filename);
+	String relative_filename = filesystem::Path(absolute_filename).proximate_to(canvas_path).u8string();
 
 	// convert "mycanvas.sfg#images/filename.png" to "#filename.png"
 	String prefix = canvas_basename + container_prefix;
@@ -159,12 +151,12 @@ CanvasFileNaming::make_full_filename(const String &canvas_filename, const String
 			 : String();
 	}
 
-	if (!etl::is_absolute_path(canvas_filename))
+	if (!filesystem::Path::is_absolute_path(canvas_filename))
 		return short_filename;
 
-	String canvas_absolute_filename = etl::absolute_path(canvas_filename);
-	String canvas_path = etl::dirname(canvas_absolute_filename);
-	String absolute_filename = etl::absolute_path(canvas_path, short_filename);
+	String canvas_absolute_filename = filesystem::Path::absolute_path(canvas_filename);
+	String canvas_path = filesystem::Path::dirname(canvas_absolute_filename);
+	String absolute_filename = filesystem::Path::absolute_path(canvas_path, short_filename);
 
 	return absolute_filename;
 }
@@ -179,10 +171,10 @@ CanvasFileNaming::make_canvas_independent_filename(const String &canvas_filename
 	if (full_filename.substr(0, container_prefix.size()) != container_prefix)
 		return full_filename;
 
-	if (!etl::is_absolute_path(canvas_filename))
+	if (!filesystem::Path::is_absolute_path(canvas_filename))
 		return full_filename;
 
-	String canvas_absolute_filename = etl::absolute_path(canvas_filename);
+	String canvas_absolute_filename = filesystem::Path::absolute_path(canvas_filename);
 	if (is_container_filename(canvas_absolute_filename))
 		return canvas_absolute_filename + full_filename;
 
@@ -190,7 +182,7 @@ CanvasFileNaming::make_canvas_independent_filename(const String &canvas_filename
 	if (content_folder.empty())
 		return canvas_absolute_filename + full_filename;
 
-	String canvas_path = etl::dirname(canvas_absolute_filename);
+	String canvas_path = filesystem::Path::dirname(canvas_absolute_filename);
 	String canvas_basename = filename_base(canvas_absolute_filename);
 	return canvas_path
 		 + ETL_DIRECTORY_SEPARATOR
@@ -207,15 +199,15 @@ CanvasFileNaming::make_local_filename(const String &canvas_filename, const Strin
 	if (filename.empty()) return String();
 	String base = filename_base(filename);
 	if (base.empty())
-		base = filename_base(etl::dirname(filename));
+		base = filename_base(filesystem::Path::dirname(filename));
 	if (base.substr(0, container_prefix.size()) == container_prefix)
 		base = base.substr(container_prefix.size());
 
-	if (!etl::is_absolute_path(canvas_filename))
+	if (!filesystem::Path::is_absolute_path(canvas_filename))
 		return base;
 
-	String canvas_absolute_filename = etl::absolute_path(canvas_filename);
-	String canvas_path = etl::dirname(canvas_absolute_filename);
+	String canvas_absolute_filename = filesystem::Path::absolute_path(canvas_filename);
+	String canvas_path = filesystem::Path::dirname(canvas_absolute_filename);
 	return canvas_path + ETL_DIRECTORY_SEPARATOR + base;
 }
 
@@ -232,9 +224,9 @@ CanvasFileNaming::make_filesystem_container(const String &filename, FileContaine
 	}
 	else
 	{
-		String dir = etl::dirname(filename);
+		String dir = filesystem::Path::dirname(filename);
 		String base = filename_base(filename);
-		String name = etl::filename_sans_extension(base);
+		String name = filesystem::Path::filename_sans_extension(base);
 		String ext = filename_extension_lower(base);
 		String prefix = dir + ETL_DIRECTORY_SEPARATOR + name + ".";
 
@@ -285,7 +277,7 @@ CanvasFileNaming::project_file(const String &filename) {
 bool
 CanvasFileNaming::is_embeded(const String &filename)
 {
-	String clean_filename = etl::cleanup_path(filename);
+	String clean_filename = filesystem::Path::cleanup_path(filename);
 	return clean_filename.size() > container_prefix.size()
 		&& clean_filename.substr(0, container_prefix.size()) == container_prefix;
 }
@@ -312,11 +304,11 @@ CanvasFileNaming::generate_container_filename(const FileSystem::Handle &canvas_f
 {
 	String base = filename_base(filename);
 	if (base.empty())
-		base = filename_base(etl::dirname(filename));
+		base = filename_base(filesystem::Path::dirname(filename));
 	if (base.substr(0, container_prefix.size()) == container_prefix)
 		base = base.substr(container_prefix.size());
 	String ext = filename_extension_lower(base);
-	base = etl::filename_sans_extension(base);
+	base = filesystem::Path::filename_sans_extension(base);
 	String content_folder = content_folder_by_extension(ext);
 	String content_prefix = content_folder.empty() ? String() : content_folder + container_directory_separator;
 
@@ -324,10 +316,10 @@ CanvasFileNaming::generate_container_filename(const FileSystem::Handle &canvas_f
 	{
 		String short_filename = i <= 1
 				              ? container_prefix + base + "." + ext
-				              : etl::strprintf("%s%s_%d.%s", container_prefix.c_str(), base.c_str(), i, ext.c_str());
+				              : strprintf("%s%s_%d.%s", container_prefix.c_str(), base.c_str(), i, ext.c_str());
 		String full_filename = i <= 1
 				             ? container_prefix + base + "." + ext
-				             : etl::strprintf("%s%s%s_%d.%s", container_prefix.c_str(), content_prefix.c_str(), base.c_str(), i, ext.c_str());
+				             : strprintf("%s%s%s_%d.%s", container_prefix.c_str(), content_prefix.c_str(), base.c_str(), i, ext.c_str());
 		if (!canvas_filesystem->is_exists(full_filename))
 			return short_filename;
 	}

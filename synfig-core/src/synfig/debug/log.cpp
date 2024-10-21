@@ -32,20 +32,18 @@
 #	include <config.h>
 #endif
 
-#include <cstdlib>
+#include "log.h"
+
+#include <cstdarg>
 
 #include <fstream>
 
-#include "log.h"
-
-#include <ETL/stringf>
 #include <synfig/general.h>
 
 #endif
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 using namespace debug;
 
@@ -59,7 +57,7 @@ using namespace debug;
 
 std::mutex Log::mutex;
 
-void Log::append_line_to_file(const String &logfile, const String &str)
+void Log::append_line_to_file(const filesystem::Path& logfile, const String& str)
 {
 	std::lock_guard<std::mutex> lock(mutex);
 	std::ofstream f(logfile.c_str(), std::ios_base::app);
@@ -67,25 +65,25 @@ void Log::append_line_to_file(const String &logfile, const String &str)
 }
 
 void
-Log::error(const String &logfile, const String &str)
+Log::error(const filesystem::Path& logfile, const String& str)
 {
 	if (logfile.empty()) synfig::error(str); else append_line_to_file(logfile, str);
 }
 
 void
-Log::warning(const String &logfile, const String &str)
+Log::warning(const filesystem::Path& logfile, const String& str)
 {
 	if (logfile.empty()) synfig::warning(str); else append_line_to_file(logfile, str);
 }
 
 void
-Log::info(const String &logfile, const String &str)
+Log::info(const filesystem::Path& logfile, const String& str)
 {
 	if (logfile.empty()) synfig::info(str); else append_line_to_file(logfile, str);
 }
 
 void
-Log::error(const String &logfile, const char *format,...)
+Log::error(const filesystem::Path& logfile, const char* format,...)
 {
 	va_list args;
 	va_start(args,format);
@@ -94,7 +92,7 @@ Log::error(const String &logfile, const char *format,...)
 }
 
 void
-Log::warning(const String &logfile, const char *format,...)
+Log::warning(const filesystem::Path& logfile, const char* format,...)
 {
 	va_list args;
 	va_start(args,format);
@@ -103,7 +101,7 @@ Log::warning(const String &logfile, const char *format,...)
 }
 
 void
-Log::info(const String &logfile, const char *format,...)
+Log::info(const filesystem::Path& logfile, const char* format,...)
 {
 	va_list args;
 	va_start(args,format);

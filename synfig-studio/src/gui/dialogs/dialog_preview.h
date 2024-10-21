@@ -33,6 +33,7 @@
 #include <gtkmm/builder.h>
 #include <gtkmm/checkbutton.h>
 #include <gtkmm/dialog.h>
+#include <gtkmm/grid.h>
 
 #include <gui/dialogsettings.h>
 #include <gui/preview.h>
@@ -63,7 +64,7 @@ class Dialog_Preview : public Gtk::Window
 	Widget_Preview 	preview;
 	DialogSettings	settings;
 
-	//etl::handle<synfig::Canvas> canvas;
+	//Canvas::Handle canvas;
 
 public:
 	Dialog_Preview();

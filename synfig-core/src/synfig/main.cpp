@@ -34,6 +34,9 @@
 #	include <config.h>
 #endif
 
+#include <cstring>
+#include <ctime>
+
 #include <synfig/localization.h>
 #include <synfig/general.h>
 
@@ -47,6 +50,7 @@
 // Includes used by get_binary_path():
 #ifdef _WIN32
 #include <windows.h>
+#include <process.h>
 #elif defined(__APPLE__)
 #include <mach-o/dyld.h>
 #include <sys/param.h>
@@ -71,6 +75,8 @@
 #include "loadcanvas.h"
 
 #include <giomm.h>
+
+#include <synfig/os.h>
 #include <synfig/synfig_export.h>
 
 #ifdef HAVE_SIGNAL_H
@@ -83,7 +89,6 @@
 #define PATH_MAX 4096
 #endif
 
-using namespace etl;
 using namespace synfig;
 
 /* === M A C R O S ========================================================= */
@@ -92,7 +97,7 @@ using namespace synfig;
 
 /* === S T A T I C S ======================================================= */
 
-static etl::reference_counter synfig_ref_count_(0);
+static ReferenceCounter synfig_ref_count_(false);
 Main *Main::instance = nullptr;
 
 class GeneralIOMutexHolder {
@@ -125,7 +130,24 @@ synfig::get_version()
 const char *
 synfig::get_build_date()
 {
-	return __DATE__;
+	const int max_date_length = 50;
+	static char date_str[max_date_length] = {0};
+
+	if (date_str[0] == 0) {
+		// https://reproducible-builds.org/specs/source-date-epoch/
+		if (char* source_date_epoch = getenv("SOURCE_DATE_EPOCH")) {
+			std::istringstream iss(source_date_epoch);
+			std::time_t t;
+			iss >> t;
+			if (iss.fail()
+			    || !iss.eof()
+			    || !std::strftime(date_str, sizeof(date_str), "%x", std::localtime(&t))) {
+				    std::strncpy(date_str, _("Unknown build date"), max_date_length-1);
+			}
+		} else
+			return __DATE__;
+	}
+	return date_str;
 }
 
 bool
@@ -170,7 +192,7 @@ static void broken_pipe_signal (int /*sig*/)  {
 
 bool retrieve_modules_to_load(String filename,std::list<String> &modules_to_load)
 {
-	std::ifstream file(Glib::locale_from_utf8(filename).c_str());
+	std::ifstream file(synfig::filesystem::Path(filename).c_str());
 
 	if(!file)
 	{
@@ -203,13 +225,23 @@ synfig::Main::Main(const synfig::String& rootpath,ProgressCallback *cb):
 	// Paths
 
 	root_path       = rootpath;
-	bin_path        = root_path  + ETL_DIRECTORY_SEPARATOR + "bin";
-	share_path      = root_path  + ETL_DIRECTORY_SEPARATOR + "share";
-	locale_path     = share_path + ETL_DIRECTORY_SEPARATOR + "locale";
-	lib_path        = root_path  + ETL_DIRECTORY_SEPARATOR + "lib";
-	lib_synfig_path = lib_path   + ETL_DIRECTORY_SEPARATOR + "synfig";
+	bin_path        = root_path  + "/bin";
+	share_path      = root_path  + "/share";
+	locale_path     = share_path + "/locale";
+	lib_path        = root_path  + "/lib";
+	lib_synfig_path = lib_path   + "/synfig";
 
 	// Add initialization after this point
+
+#ifdef _MSC_VER
+	{
+		synfig::filesystem::Path module_location = synfig::OS::get_binary_path();
+		synfig::filesystem::Path fontconfig_path = module_location.append("../../etc/fonts").cleanup();
+		std::basic_string<wchar_t> envstring = L"FONTCONFIG_PATH=" + fontconfig_path.native();
+		_wputenv(envstring.c_str());
+	}
+	_putenv("FONTCONFIG_FILE=fonts.conf");
+#endif
 
 #ifdef ENABLE_NLS
 	bindtextdomain("synfig", Glib::locale_from_utf8(locale_path).c_str() );
@@ -315,12 +347,15 @@ synfig::Main::Main(const synfig::String& rootpath,ProgressCallback *cb):
 	else
 	{
 		locations.push_back("./" MODULE_LIST_FILENAME);
-		if(getenv("HOME"))
-			locations.push_back(strprintf("%s/.local/share/synfig/%s", getenv("HOME"), MODULE_LIST_FILENAME));
+		const std::string home = Glib::getenv("HOME");
+		if (!home.empty()) {
+			locations.push_back(strprintf("%s/.local/share/synfig/%s", home.c_str(), MODULE_LIST_FILENAME));
+		}
+
 	#ifdef SYSCONFDIR
 		locations.push_back(SYSCONFDIR"/" MODULE_LIST_FILENAME);
 	#endif
-		locations.push_back(root_path + ETL_DIRECTORY_SEPARATOR + "etc" + ETL_DIRECTORY_SEPARATOR + MODULE_LIST_FILENAME);
+		locations.push_back(root_path + "/etc/" + MODULE_LIST_FILENAME);
 	#ifndef _WIN32
 		locations.push_back("/usr/local/etc/" MODULE_LIST_FILENAME);
 	#endif
@@ -381,7 +416,7 @@ synfig::Main::~Main()
 	{
 		synfig::warning("Canvases still open!");
 		for (const auto& iter : get_open_canvas_map()) {
-			synfig::warning("%s: count()=%d",iter.second.c_str(), iter.first->count());
+			synfig::warning("%s: count()=%d", iter.second.c_str(), iter.first->use_count());
 		}
 	}
 
@@ -407,7 +442,7 @@ synfig::Main::~Main()
 #endif
 
 	assert(instance);
-	instance = NULL;
+	instance = nullptr;
 }
 
 static const String
@@ -479,11 +514,9 @@ synfig::info(const String &str)
 	general_io_mutex.unlock();
 }
 
-// synfig::get_binary_path()
 // See also: http://libsylph.sourceforge.net/wiki/Full_path_to_binary
-
-String
-synfig::get_binary_path(const String &fallback_path)
+filesystem::Path
+synfig::OS::get_binary_path()
 {
 	
 	String result;
@@ -491,24 +524,22 @@ synfig::get_binary_path(const String &fallback_path)
 #ifdef _WIN32
 
 	wchar_t module_file_name[MAX_PATH];
-	if (GetModuleFileNameW(NULL, module_file_name, MAX_PATH)) {
-		result = String(g_utf16_to_utf8((gunichar2 *)module_file_name, -1, NULL, NULL, NULL));
+	if (GetModuleFileNameW(nullptr, module_file_name, MAX_PATH)) {
+		result = String(g_utf16_to_utf8((gunichar2 *)module_file_name, -1, nullptr, nullptr, nullptr));
 	}
 
 
 #elif defined(__APPLE__)
 	
 	uint32_t buf_size = MAXPATHLEN;
-	char* path = (char*)malloc(MAXPATHLEN);
+	std::vector<char> path(MAXPATHLEN);
 	
-	if(_NSGetExecutablePath(path, &buf_size) == -1 ) {
-		path = (char*)realloc(path, buf_size);
-		_NSGetExecutablePath(path, &buf_size);
+	if(_NSGetExecutablePath(path.data(), &buf_size) == -1 ) {
+		path.resize(buf_size);
+		_NSGetExecutablePath(path.data(), &buf_size);
 	}
 	
-	result = String(path);
-	
-	free(path);
+	result = String(path.data());
 	
 	// "./synfig" case workaround
 	String artifact("/./");
@@ -516,24 +547,31 @@ synfig::get_binary_path(const String &fallback_path)
 	if (start_pos != std::string::npos)
 		result.replace(start_pos, artifact.length(), "/");
 	
-#elif !defined(__OpenBSD__)
+#else
 
 	size_t buf_size = PATH_MAX - 1;
-	char* path = (char*)malloc(buf_size);
+	std::vector<char> path(buf_size);
 
 	ssize_t size;
 	struct stat stat_buf;
-	FILE *f;
 
 	/* Read from /proc/self/exe (symlink) */
-	//char* path2 = (char*)malloc(buf_size);
-	char* path2 = new char[buf_size];
-	strncpy(path2, "/proc/self/exe", buf_size - 1);
+	std::vector<char> path2(buf_size);
+	const char* procfs_path =
+#if defined(__FreeBSD__) || defined (__DragonFly__) || defined (__OpenBSD__)
+		"/proc/curproc/file";
+#elif defined(__NetBSD__)
+		"/proc/curproc/exe";
+#else
+		"/proc/self/exe";
+#endif
+
+	strncpy(path2.data(), procfs_path, buf_size - 1);
 
 	while (1) {
 		int i;
 
-		size = readlink(path2, path, buf_size - 1);
+		size = readlink(path2.data(), path.data(), buf_size - 1);
 		if (size == -1) {
 			/* Error. */
 			break;
@@ -544,7 +582,7 @@ synfig::get_binary_path(const String &fallback_path)
 
 		/* Check whether the symlink's target is also a symlink.
 		 * We want to get the final target. */
-		i = stat(path, &stat_buf);
+		i = stat(path.data(), &stat_buf);
 		if (i == -1) {
 			/* Error. */
 			break;
@@ -554,19 +592,20 @@ synfig::get_binary_path(const String &fallback_path)
 		if (!S_ISLNK(stat_buf.st_mode)) {
 
 			/* path is not a symlink. Done. */
-			result = String(path);
+			result = String(path.data());
 			
 			break;
 		}
 
 		/* path is a symlink. Continue loop and resolve this. */
-		strncpy(path, path2, buf_size - 1);
+		strncpy(path.data(), path2.data(), buf_size - 1);
 	}
 	
-	//free(path2);
-	delete[] path2;
+	path2.clear();
+	path.clear();
 
-	if (result == "")
+#if ! (defined(__FreeBSD__) || defined(__DragonFly__) || defined(__NetBSD__) || defined (__OpenBSD__))
+	if (result.empty())
 	{
 		/* readlink() or stat() failed; this can happen when the program is
 		 * running in Valgrind 2.2. Read from /proc/self/maps as fallback. */
@@ -574,15 +613,15 @@ synfig::get_binary_path(const String &fallback_path)
 		buf_size = PATH_MAX + 128;
 		char* line = (char*)malloc(buf_size);
 
-		f = fopen("/proc/self/maps", "r");
-		if (f == NULL) {
+		FILE* f = fopen("/proc/self/maps", "r");
+		if (!f) {
 			synfig::error("Cannot open /proc/self/maps.");
 		}
 
 		/* The first entry should be the executable name. */
 		char *r;
 		r = fgets(line, (int) buf_size, f);
-		if (r == NULL) {
+		if (!r) {
 			synfig::error("Cannot read /proc/self/maps.");
 		}
 
@@ -596,19 +635,18 @@ synfig::get_binary_path(const String &fallback_path)
 			line[buf_size - 1] = 0;
 
 		/* Extract the filename; it is always an absolute path. */
-		path = strchr(line, '/');
+		char* path3 = strchr(line, '/');
 
 		/* Sanity check. */
-		if (strstr(line, " r-xp ") == NULL || path == NULL) {
+		if (strstr(line, " r-xp ") == nullptr || !path3) {
 			synfig::error("Invalid /proc/self/maps.");
 		}
 
-		result = String(path);
+		result = String(path3);
 		free(line);
 		fclose(f);
 	}
-	
-	free(path);
+#endif
 
 	result = Glib::filename_to_utf8(result);
 
@@ -618,7 +656,7 @@ synfig::get_binary_path(const String &fallback_path)
 	{
 		// In worst case use value specified as fallback 
 		// (usually should come from argv[0])
-		result = etl::absolute_path(fallback_path);
+		return filesystem::absolute(OS::fallback_binary_path).u8string();
 	}
 	
 	

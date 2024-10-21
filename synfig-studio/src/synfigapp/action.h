@@ -111,7 +111,7 @@ public:
 	{
 		va_list args;
 		va_start(args,format);
-		desc_=etl::vstrprintf(format,args);
+		desc_=synfig::vstrprintf(format,args);
 		va_end(args);
 	}
 
@@ -120,7 +120,7 @@ public:
 	{
 		va_list args;
 		va_start(args,format);
-		desc_=etl::vstrprintf(format,args);
+		desc_=synfig::vstrprintf(format,args);
 		va_end(args);
 	}
 
@@ -231,8 +231,8 @@ public:
 	bool is_active()const { return active_; }
 
 #ifdef _DEBUG
-	virtual void ref()const;
-	virtual bool unref()const;
+	virtual void ref() const noexcept;
+	virtual void unref()const;
 #endif
 }; // END of class Action::Undoable
 

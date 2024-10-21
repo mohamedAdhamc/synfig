@@ -60,7 +60,6 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace studio;
 using namespace synfig;
 using namespace synfigapp;
@@ -78,7 +77,7 @@ StateBone studio::state_bone;
 
 class studio::StateBone_Context : public sigc::trackable
 {
-	etl::handle<CanvasView> canvas_view_;
+	CanvasView::Handle canvas_view_;
 	CanvasView::IsWorking is_working;
 
 	bool prev_table_status;
@@ -89,7 +88,7 @@ class studio::StateBone_Context : public sigc::trackable
 	Canvas::Handle canvas;
 
 	Duck::Handle  point2_duck,point1_duck;
-	handle<Duckmatic::Bezier> bone_bezier;
+	Duckmatic::Bezier::Handle bone_bezier;
 
 	Gtk::Menu menu;
 
@@ -111,7 +110,7 @@ class studio::StateBone_Context : public sigc::trackable
 
 	// layer name:
 	Gtk::Label id_label;
-	Gtk::HBox id_box;
+	Gtk::Box id_box;
 	Gtk::Entry id_entry;
 
 	//  bone width
@@ -193,7 +192,7 @@ public:
 
 	~StateBone_Context();
 
-	const etl::handle<CanvasView>& get_canvas_view() const {return canvas_view_;}
+	const CanvasView::Handle& get_canvas_view() const {return canvas_view_;}
 	etl::handle<synfigapp::CanvasInterface> get_canvas_interface() const {return canvas_view_->canvas_interface();}
 	synfig::Canvas::Handle get_canvas() const {return canvas_view_->get_canvas();}
 	WorkArea * get_work_area() const {return canvas_view_->get_work_area();}
@@ -215,7 +214,7 @@ public:
 /* === M E T H O D S ======================================================= */
 
 StateBone::StateBone() :
-	Smach::state<StateBone_Context>("bone")
+	Smach::state<StateBone_Context>("bone", N_("Skeleton Tool"))
 {
 	insert(event_def(EVENT_LAYER_SELECTION_CHANGED,		&StateBone_Context::event_layer_selection_changed_handler));
 	insert(event_def(EVENT_REFRESH_DUCKS,				&StateBone_Context::event_hijack));
@@ -244,9 +243,9 @@ StateBone_Context::load_settings()
 			set_id(settings.get_value("bone.skel_deform_id", _("NewSkeletonDeformation")));
 		}
 
-		set_skel_bone_width(settings.get_value("bone.skel_bone_width", Distance(DEFAULT_WIDTH)));
+		set_skel_bone_width(settings.get_value("bone.skel_bone_width", Distance(DEFAULT_WIDTH)).as(App::distance_system, get_canvas()->rend_desc()));
 
-		set_skel_deform_bone_width(settings.get_value("bone.skel_deform_bone_width", Distance(DEFAULT_WIDTH)));
+		set_skel_deform_bone_width(settings.get_value("bone.skel_deform_bone_width", Distance(DEFAULT_WIDTH)).as(App::distance_system, get_canvas()->rend_desc()));
 	}
 	catch(...)
 	{
@@ -426,7 +425,7 @@ StateBone_Context::StateBone_Context(CanvasView *canvas_view) :
 	Layer::Handle layer = get_canvas_interface()->get_selection_manager()->get_selected_layer();
 
 	if(Layer_SkeletonDeformation::Handle::cast_dynamic(layer)){
-		get_work_area()->set_type_mask(get_work_area()->get_type_mask() - Duck::TYPE_TANGENT | (Duck::TYPE_WIDTH | Duck::TYPE_WIDTHPOINT_POSITION));
+		get_work_area()->set_type_mask((get_work_area()->get_type_mask() - Duck::TYPE_TANGENT) | (Duck::TYPE_WIDTH | Duck::TYPE_WIDTHPOINT_POSITION));
 		get_canvas_view()->toggle_duck_mask(Duck::TYPE_NONE);
 		layer->disable();
 		get_canvas_interface()->signal_layer_status_changed()(layer,false);
@@ -470,7 +469,7 @@ StateBone_Context::refresh_tool_options()
 	App::dialog_tool_options->set_name("bone");
 
 	App::dialog_tool_options->add_button(
-			Gtk::StockID("gtk-clear"),
+			"edit-clear",
 			_("Clear current Skeleton")
 	)->signal_clicked().connect(
 			sigc::mem_fun(
@@ -675,7 +674,7 @@ StateBone_Context::event_mouse_release_handler(const Smach::event& x)
 				const int item_index = must_create_layer ? 0 : find_bone_index(skel_layer? SKELETON_TYPE : SKELETON_DEFORMATION_TYPE, list_node, active_bone);
 				ValueDesc value_desc = ValueDesc(list_node,item_index,list_desc);
 
-				if(active_bone && item_index >= 0 && !list_node->list.empty()){
+				if(active_bone && !must_create_layer && item_index >= 0 && !list_node->list.empty()) {
 					// if active bone is already set
 					ValueNode_Bone::Handle bone_node = ValueNode_Bone::Handle::cast_dynamic(active_bone);
 					if (deform_layer) {
@@ -899,7 +898,7 @@ StateBone_Context::find_bone(Point point,Layer::Handle layer) const
 		}
 	}
 	if(std::fabs(close_line)<=0.2){
-		if (ret >=0 && ret < bone_list.size()) {
+		if (ret >=0 && ret < static_cast<int>(bone_list.size())) {
 			ValueNode_StaticList::Handle list_node;
 			list_node=ValueNode_StaticList::Handle::cast_dynamic(list_desc.get_value_node());
 			if (is_skeleton_deform_layer)

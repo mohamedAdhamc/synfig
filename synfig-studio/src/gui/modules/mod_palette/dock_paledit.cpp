@@ -39,6 +39,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 
+#include <gtkmm/image.h>
 #include <gtkmm/imagemenuitem.h>
 #include <gtkmm/menu.h>
 #include <gtkmm/stylecontext.h>
@@ -128,9 +129,9 @@ Dock_PalEdit::Dock_PalEdit():
 	get_style_context()->add_class("synfigstudio-efficient-workspace");
 
 	action_group=Gtk::ActionGroup::create("action_group_pal_edit");
-	action_group->add(Gtk::Action::create(
+	action_group->add(Gtk::Action::create_with_icon_name(
 		"palette-add-color",
-		Gtk::StockID("gtk-add"),
+		"list-add",
 		_("Add Color"),
 		_("Add current outline color\nto the palette")
 	),
@@ -139,9 +140,9 @@ Dock_PalEdit::Dock_PalEdit():
 			&Dock_PalEdit::on_add_pressed
 		)
 	);
-	action_group->add(Gtk::Action::create(
+	action_group->add(Gtk::Action::create_with_icon_name(
 		"palette-save",
-		Gtk::StockID("gtk-save"),
+		"document-save",
 		_("Save palette"),
 		_("Save the current palette")
 	),
@@ -150,9 +151,9 @@ Dock_PalEdit::Dock_PalEdit():
 			&Dock_PalEdit::on_save_pressed
 		)
 	);
-	action_group->add(Gtk::Action::create(
+	action_group->add(Gtk::Action::create_with_icon_name(
 		"palette-load",
-		Gtk::StockID("gtk-open"),
+		"document-open",
 		_("Open a palette"),
 		_("Open a saved palette")
 	),
@@ -161,9 +162,9 @@ Dock_PalEdit::Dock_PalEdit():
 			&Dock_PalEdit::on_open_pressed
 		)
 	);
-	action_group->add(Gtk::Action::create(
+	action_group->add(Gtk::Action::create_with_icon_name(
 		"palette-set-default",
-		Gtk::StockID("gtk-refresh"),
+		"view-refresh",
 		_("Load default"),
 		_("Load default palette")
 	),
@@ -195,7 +196,7 @@ Dock_PalEdit::Dock_PalEdit():
 
 	/*
 	add_button(
-		Gtk::StockID("gtk-add"),
+		"list-add",
 		_("Add current outline color\nto the palette")
 	)->signal_clicked().connect(
 		sigc::mem_fun(
@@ -237,37 +238,42 @@ Dock_PalEdit::on_save_pressed()
 	// it would be nice to have initial spal file name same as current canvas name, 
 	// use "My Palette" as temporary spal file name as a hack.
 	//synfig::String filename = selected_instance->get_file_name();
-	std::string filename = "My Palette";
+	synfig::filesystem::Path filename("My Palette");
 	while (App::dialog_save_file_spal(_("Please choose a file name"), filename, ANIMATION_DIR_PREFERENCE))
 	{
 		// If the filename still has wildcards, then we should
 		// continue looking for the file we want
-		if (etl::basename(filename).find('*') != std::string::npos) {
+		if (filename.filename().u8string().find('*') != std::string::npos) {
 			continue;
 		}
 
 		{
-			struct stat	s;
+#if _WIN32
+			struct _stat s;
+			int stat_return = _wstat(filename.c_str(), &s);
+#else
+			struct stat s;
 			int stat_return = stat(filename.c_str(), &s);
+#endif
 
 			// if stat() fails with something other than 'file doesn't exist', there's been a real
 			// error of some kind.  let's give up now and ask for a new path.
 			if (stat_return == -1 && errno != ENOENT)
 			{
-				perror(filename.c_str());
-				std::string msg(etl::strprintf(_("Unable to check whether '%s' exists."), filename.c_str()));
+				perror(filename.u8_str());
+				std::string msg(synfig::strprintf(_("Unable to check whether '%s' exists."), filename.c_str()));
 				App::dialog_message_1b("ERROR", msg, "details", _("Close"));
 				continue;
 			}
 
 			// if the file exists and the user doesn't want to overwrite it, keep prompting for a filename
-			std::string message = etl::strprintf(_("A file named \"%s\" already exists. "
+			std::string message = synfig::strprintf(_("A file named \"%s\" already exists. "
 							"Do you want to replace it?"),
-							etl::basename(filename).c_str());
+							filename.filename().u8_str());
 
-			std::string details = etl::strprintf(_("The file already exists in \"%s\". "
+			std::string details = synfig::strprintf(_("The file already exists in \"%s\". "
 							"Replacing it will overwrite its contents."),
-							etl::basename(etl::dirname(filename)).c_str());
+							filename.parent_path().filename().u8_str());
 
 			if ((stat_return == 0) && !App::dialog_message_2b(
 				message,
@@ -291,12 +297,12 @@ Dock_PalEdit::on_save_pressed()
 void
 Dock_PalEdit::on_open_pressed()
 {
-	synfig::String filename = "*.spal";
+	synfig::filesystem::Path filename("*.spal");
 	while(App::dialog_open_file_spal(_("Please select a palette file"), filename, ANIMATION_DIR_PREFERENCE))
 	{
 		// If the filename still has wildcards, then we should
 		// continue looking for the file we want
-		if (filename.find('*') != std::string::npos) {
+		if (filename.u8string().find('*') != std::string::npos) {
 			continue;
 		}
 
@@ -314,27 +320,34 @@ Dock_PalEdit::on_open_pressed()
 	refresh();
 }
 
+static Gtk::MenuItem*
+image_menu_item(const std::string& icon_name, const Glib::ustring& label_text, bool mnemonic = false)
+{
+	Gtk::Image* icon = Gtk::manage(new Gtk::Image());
+	icon->set_from_icon_name(icon_name, Gtk::BuiltinIconSize::ICON_SIZE_BUTTON);
+	Gtk::MenuItem* item = Gtk::manage(new Gtk::ImageMenuItem(*icon, label_text, mnemonic));
+	item->show_all();
+	return item;
+}
+
 void
 Dock_PalEdit::show_menu(int i)
 {
 	Gtk::Menu* menu(manage(new Gtk::Menu()));
 	menu->signal_hide().connect(sigc::bind(sigc::ptr_fun(&delete_widget), menu));
 
-	Gtk::MenuItem *item;
-	item = manage(new Gtk::ImageMenuItem(Gtk::StockID("gtk-select-color")));
+	Gtk::MenuItem *item = image_menu_item("type_color_icon", _("_Color"), true);
 	item->signal_activate().connect(
 		sigc::bind(
 			sigc::mem_fun(*this,&studio::Dock_PalEdit::edit_color),
 			i ));
-	item->show_all();
 	menu->append(*item);
 
-	item = manage(new Gtk::ImageMenuItem(Gtk::StockID("gtk-delete")));
+	item = image_menu_item("edit-delete", _("_Delete"), true);
 	item->signal_activate().connect(
 		sigc::bind(
 			sigc::mem_fun(*this,&studio::Dock_PalEdit::erase_color),
 			i ));
-	item->show_all();
 	menu->append(*item);
 
 	menu->popup(3,gtk_get_current_event_time());
@@ -375,6 +388,11 @@ void
 Dock_PalEdit::refresh()
 {
 	const int width(12);
+
+	// Free table children from memory
+	std::vector<Widget*> children = table.get_children();
+	for(Widget* child : children)
+		delete child;
 
 	// Clear the table
 	table.foreach(sigc::mem_fun(table,&Gtk::Table::remove));

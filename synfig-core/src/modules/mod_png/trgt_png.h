@@ -31,9 +31,8 @@
 /* === H E A D E R S ======================================================= */
 
 #include <png.h>
+#include <synfig/smartfile.h>
 #include <synfig/target_scanline.h>
-#include <synfig/targetparam.h>
-#include <cstdio>
 
 /* === M A C R O S ========================================================= */
 
@@ -44,8 +43,10 @@
 class png_trgt : public synfig::Target_Scanline
 {
 	SYNFIG_TARGET_MODULE_EXT
+
 private:
-	FILE *file;
+
+	synfig::SmartFILE file;
 	//int w,h;
 	png_structp png_ptr;
 	png_infop info_ptr;
@@ -54,21 +55,23 @@ private:
 	static void png_out_warning(png_struct *png,const char *msg);
 	bool multi_image,ready;
 	int imagecount;
-	synfig::String filename;
-	unsigned char *buffer;
-	synfig::Color *color_buffer;
+	synfig::filesystem::Path filename;
+	std::vector<unsigned char> buffer;
+	std::vector<synfig::Color> color_buffer;
 	synfig::String sequence_separator;
+
 public:
-	png_trgt(const char *filename, const synfig::TargetParam& /* params */);
+
+	png_trgt(const synfig::filesystem::Path& filename, const synfig::TargetParam& /* params */);
 	virtual ~png_trgt();
 
-	virtual bool set_rend_desc(synfig::RendDesc *desc);
-	virtual bool start_frame(synfig::ProgressCallback *cb);
-	virtual void end_frame();
+	bool set_rend_desc(synfig::RendDesc* desc) override;
 
-	virtual synfig::Color * start_scanline(int scanline);
-	virtual bool end_scanline();
-};
+	bool start_frame(synfig::ProgressCallback* cb) override;
+	void end_frame() override;
+
+	synfig::Color* start_scanline(int scanline) override;
+	bool end_scanline() override;};
 
 /* === E N D =============================================================== */
 

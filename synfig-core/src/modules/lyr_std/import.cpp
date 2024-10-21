@@ -55,7 +55,6 @@
 
 #endif
 
-using namespace etl;
 using namespace synfig;
 using namespace modules;
 using namespace lyr_std;
@@ -105,7 +104,7 @@ Import::set_param(const String & param, const ValueBase &value)
 		{
 			importer.reset();
 			rendering_surface.reset();
-			param_filename.set(value.get(String()));
+			param_filename.set(FileSystem::fix_slashes(value.get(String())));
 			return true;
 		}
 
@@ -115,7 +114,7 @@ Import::set_param(const String & param, const ValueBase &value)
 			return false;
 		}
 
-		String filename = value.get(String());
+		String filename = FileSystem::fix_slashes(value.get(String()));
 		String fixed_filename = filename;
 
 		// TODO: find source of this sreening of unicode characters
@@ -144,7 +143,7 @@ Import::set_param(const String & param, const ValueBase &value)
 
 		this->independent_filename = independent_filename;
 
-		handle<Importer> newimporter;
+		Importer::Handle newimporter;
 		newimporter = Importer::open(get_canvas()->get_file_system()->get_identifier(full_filename));
 
 		if (!newimporter)
@@ -166,8 +165,10 @@ Import::set_param(const String & param, const ValueBase &value)
 		if (!newimporter->is_animated())
 			time = Time(0);
 
-		rendering_surface = new rendering::SurfaceResource(
-			newimporter->get_frame(get_canvas()->rend_desc(), time) );
+		rendering::Surface::Handle surface = newimporter->get_frame(get_canvas()->rend_desc(), time);
+		if (!surface)
+			return false;
+		rendering_surface = new rendering::SurfaceResource(surface);
 		importer=newimporter;
 		param_filename.set(filename);
 
@@ -223,8 +224,14 @@ void
 Import::load_resources_vfunc(IndependentContext context, Time time)const
 {
 	Time time_offset=param_time_offset.get(Time());
-	if(get_amount() && importer && importer->is_animated())
-		rendering_surface = new rendering::SurfaceResource(
-			importer->get_frame(get_canvas()->rend_desc(), time+time_offset) );
+	if(get_amount() && importer && importer->is_animated()) {
+		rendering::Surface::Handle surface = importer->get_frame(get_canvas()->rend_desc(), time+time_offset);
+		if (!surface) {
+			synfig::error(_("Couldn't load resources: couldn't get frame at %s"), (time + time_offset).get_string().c_str());
+			rendering_surface = nullptr;
+			return;
+		}
+		rendering_surface = new rendering::SurfaceResource(surface);
+	}
 	context.load_resources(time);
 }

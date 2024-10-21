@@ -58,10 +58,10 @@ using namespace studio;
 
 /* === M E T H O D S ======================================================= */
 
-AutoRecover::AutoRecover():
-	enabled(1),
-	timeout_ms(15000)
-{ }
+AutoRecover::AutoRecover()
+{
+	set_timer(true, 15000);
+}
 
 AutoRecover::~AutoRecover()
 {
@@ -75,6 +75,7 @@ AutoRecover::set_timer(bool enabled, int timeout_ms)
 	if (this->enabled != enabled || this->timeout_ms != timeout_ms)
 	{
 		bool env_enabled = !getenv("SYNFIG_DISABLE_AUTO_SAVE");
+		// if the timer was enabled then disconnect it
 		if (this->enabled && this->timeout_ms > 0 && env_enabled)
 			connection.disconnect();
 
@@ -97,16 +98,17 @@ AutoRecover::auto_backup()
 	int count = 0;
 	try
 	{
-		for(std::list< etl::handle<Instance> >::iterator i = App::instance_list.begin(); i != App::instance_list.end(); ++i)
+		for (const auto& instance : App::instance_list) {
 			try
 			{
-				if ((*i)->backup())
+				if (instance->backup())
 					++count;
 			}
 			catch(...)
 			{
 				synfig::error("AutoRecover::auto_backup(): UNKNOWN EXCEPTION THROWN.");
 			}
+		}
 	}
 	catch(...)
 	{
@@ -141,7 +143,7 @@ AutoRecover::recover(int &number_recovered)
 	{
 		success = true;
 		for(FileSystem::FileList::const_iterator i = files.begin(); i != files.end(); ++i)
-			if (App::open_from_temporary_filesystem(App::get_temporary_directory() + ETL_DIRECTORY_SEPARATOR + *i))
+			if (App::open_from_temporary_filesystem(App::get_temporary_directory() / *i))
 				++number_recovered;
 			else
 				success=false;
@@ -160,16 +162,15 @@ AutoRecover::clear_backups()
 		for(FileSystem::FileList::const_iterator i = files.begin(); i != files.end(); ++i)
 		{
 			// FileSystemTemporary will clear opened temporary files in destructor
-			String filename = App::get_temporary_directory() + ETL_DIRECTORY_SEPARATOR + *i;
+			filesystem::Path filename = App::get_temporary_directory() / *i;
 			bool s = false;
-			try { s = FileSystemTemporary("").open_temporary(filename); }
-			catch (...)
-			{
+			try {
+				s = FileSystemTemporary("").open_temporary(filename);
+			} catch (...) {
 				synfig::warning("Autobackup file is not recoverable. Forcing to remove.");
 			}
-			if (!s)
-			{
-				FileSystemNative::instance()->file_remove(filename);
+			if (!s) {
+				FileSystemNative::instance()->file_remove(filename.u8string());
 				success = false;
 			}
 		}

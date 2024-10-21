@@ -39,23 +39,21 @@
 #include <synfig/valuenode_registry.h>
 #include <synfig/general.h>
 #include <synfig/localization.h>
+#include <synfig/misc.h>
 #include "synfig/color.h"
 #include <synfig/vector.h>
-
-#include <ETL/misc>
 
 #endif
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 
 /* === M A C R O S ========================================================= */
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Random, RELEASE_VERSION_0_61_08, "random", "Random")
+REGISTER_VALUENODE(ValueNode_Random, RELEASE_VERSION_0_61_08, "random", N_("Random"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -64,9 +62,8 @@ REGISTER_VALUENODE(ValueNode_Random, RELEASE_VERSION_0_61_08, "random", "Random"
 ValueNode_Random::ValueNode_Random(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
-	random.set_seed(time(NULL));
+	init_children_vocab();
+	random.set_seed(time(nullptr));
 
 	set_link("radius",ValueNode_Const::create(Real(1)));
 	set_link("seed",ValueNode_Const::create(random.get_seed()));
@@ -119,7 +116,7 @@ ValueNode_Random::~ValueNode_Random()
 ValueBase
 ValueNode_Random::operator()(Time t)const
 {
-	typedef const RandomNoise::SmoothType Smooth;
+	typedef RandomNoise::SmoothType Smooth;
 
 	Real	radius	= (*radius_)(t).get(Real());
 	int		seed	= (*seed_)(t).get(int());
@@ -227,7 +224,7 @@ ValueNode_Random::randomize_seed()
 	ValueNode::Handle link = get_link_vfunc(i);
 	if(!link->is_exported() && link->get_name() == "constant")
 	{
-		int seed = time(NULL) + rand();
+		int seed = time(nullptr) + rand();
 		if (seed < 0) seed = -seed;
 		random.set_seed(seed);
 		set_link(i, ValueNode_Const::create(seed));
@@ -242,27 +239,27 @@ ValueNode_Random::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"link")
+	ret.push_back(ParamDesc("link")
 		.set_local_name(_("Link"))
 		.set_description(_("The value node source that provides the central value"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"radius")
+	ret.push_back(ParamDesc("radius")
 		.set_local_name(_("Radius"))
 		.set_description(_("The value of the maximum random difference"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"seed")
+	ret.push_back(ParamDesc("seed")
 		.set_local_name(_("Seed"))
 		.set_description(_("Seeds the random number generator"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"speed")
+	ret.push_back(ParamDesc("speed")
 		.set_local_name(_("Speed"))
 		.set_description(_("Defines how often a new random value is chosen (in choices per second) "))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"smooth")
+	ret.push_back(ParamDesc("smooth")
 		.set_local_name(_("Interpolation"))
 		.set_description(_("Determines how the value is interpolated from one random choice to the next"))
 		.set_hint("enum")
@@ -274,7 +271,7 @@ ValueNode_Random::get_children_vocab_vfunc()const
 	);
 
 
-	ret.push_back(ParamDesc(ValueBase(),"loop")
+	ret.push_back(ParamDesc("loop")
 		.set_local_name(_("Loop Time"))
 		.set_description(_("Makes the random value repeat after the given time"))
 	);

@@ -50,14 +50,13 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 
 /* === M A C R O S ========================================================= */
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_DynamicList, RELEASE_VERSION_0_61_06, "dynamic_list", "Dynamic List")
+REGISTER_VALUENODE(ValueNode_DynamicList, RELEASE_VERSION_0_61_06, "dynamic_list", N_("Dynamic List"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -138,6 +137,7 @@ ValueNode_DynamicList::reindex()
 			iter->set_parent_value_node(this);
 		}
 	}
+	init_children_vocab();
 }
 
 ValueNode_DynamicList::ListEntry
@@ -397,6 +397,9 @@ ValueNode_DynamicList::ListEntry::amount_at_time(const Time &t,bool *rising)cons
 {
 	typedef synfig::ValueNode_DynamicList::ListEntry::ActivepointList ActivepointList;
 
+	if (rising)
+		*rising = false;
+
 	if(timing_info.empty())
 		return 1.0f;
 
@@ -595,8 +598,8 @@ ValueNode_DynamicList::ValueNode_DynamicList(Type &container_type, Canvas::Loose
 	container_type(&container_type),
 	loop_(false)
 {
-	if (getenv("SYNFIG_DEBUG_SET_PARENT_CANVAS"))
-		printf("%s:%d set parent canvas for dynamic_list %p to %p\n", __FILE__, __LINE__, this, canvas.get());
+	DEBUG_LOG("SYNFIG_DEBUG_SET_PARENT_CANVAS",
+		"%s:%d set parent canvas for dynamic_list %p to %p\n", __FILE__, __LINE__, this, canvas.get());
 	set_parent_canvas(canvas);
 }
 
@@ -605,8 +608,8 @@ ValueNode_DynamicList::ValueNode_DynamicList(Type &container_type, Type &type, C
 	container_type(&container_type),
 	loop_(false)
 {
-	if (getenv("SYNFIG_DEBUG_SET_PARENT_CANVAS"))
-		printf("%s:%d set parent canvas for dynamic_list %p to %p\n", __FILE__, __LINE__, this, canvas.get());
+	DEBUG_LOG("SYNFIG_DEBUG_SET_PARENT_CANVAS",
+		"%s:%d set parent canvas for dynamic_list %p to %p\n", __FILE__, __LINE__, this, canvas.get());
 	set_parent_canvas(canvas);
 }
 
@@ -623,7 +626,7 @@ ValueNode_DynamicList::~ValueNode_DynamicList()
 }
 
 ValueNode_DynamicList*
-ValueNode_DynamicList::create(const ValueBase& value, etl::loose_handle<Canvas>)
+ValueNode_DynamicList::create(const ValueBase& value, Canvas::LooseHandle)
 {
 	//vector<ValueBase> value_list(value.operator vector<ValueBase>());
 	std::vector<ValueBase> value_list(value.get_list());
@@ -653,8 +656,8 @@ ValueNode_DynamicList::create(const ValueBase& value, etl::loose_handle<Canvas>)
 ValueBase
 ValueNode_DynamicList::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	std::vector<ValueBase> ret_list;
 	std::vector<ListEntry>::const_iterator iter;
@@ -719,7 +722,7 @@ ValueNode_DynamicList::link_local_name(int i)const
 {
 	assert(i>=0 && i<link_count());
 
-	return etl::strprintf(_("Item %03d"),i+1);
+	return strprintf(_("Item %03d"),i+1);
 }
 
 ValueNode::Handle
@@ -774,7 +777,7 @@ ValueNode_DynamicList::check_type(Type &type)
 }
 
 void
-ValueNode_DynamicList::set_member_canvas(etl::loose_handle<Canvas> canvas)
+ValueNode_DynamicList::set_member_canvas(Canvas::LooseHandle canvas)
 {
 	for (std::vector<ListEntry>::iterator iter = list.begin(); iter != list.end(); iter++)
 		iter->value_node->set_parent_canvas(canvas);
@@ -970,8 +973,8 @@ ValueNode_DynamicList::get_children_vocab_vfunc()const
 	LinkableValueNode::Vocab ret;
 	for(unsigned int i=0; i<list.size();i++)
 	{
-		ret.push_back(ParamDesc(ValueBase(),strprintf("item%04d",i))
-			.set_local_name(etl::strprintf(_("Item %03d"),i+1))
+		ret.push_back(ParamDesc(strprintf("item%04d",i))
+			.set_local_name(strprintf(_("Item %03d"),i+1))
 		);
 	}
 

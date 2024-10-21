@@ -30,13 +30,10 @@
 
 #include <gui/dialogs/dialog_workspaces.h>
 
-#include <gui/app.h>
 #include <gui/localization.h>
+#include <gui/mainwindow.h>
 #include <gui/resourcehelper.h>
 #include <gui/workspacehandler.h>
-
-#include <glibmm/fileutils.h>
-#include <glibmm/markup.h>
 
 #include <gtkmm/liststore.h>
 #include <gtkmm/messagedialog.h>
@@ -48,30 +45,6 @@
 #endif
 
 using namespace studio;
-
-static Glib::RefPtr<Gtk::Builder> load_interface() {
-	auto refBuilder = Gtk::Builder::create();
-	try
-	{
-		refBuilder->add_from_file(ResourceHelper::get_ui_path("dialog_workspaces.glade"));
-	}
-	catch(const Glib::FileError& ex)
-	{
-		synfig::error("FileError: " + ex.what());
-		return Glib::RefPtr<Gtk::Builder>();
-	}
-	catch(const Glib::MarkupError& ex)
-	{
-		synfig::error("MarkupError: " + ex.what());
-		return Glib::RefPtr<Gtk::Builder>();
-	}
-	catch(const Gtk::BuilderError& ex)
-	{
-		synfig::error("BuilderError: " + ex.what());
-		return Glib::RefPtr<Gtk::Builder>();
-	}
-	return refBuilder;
-}
 
 class WorkspaceCols: public Gtk::TreeModel::ColumnRecord {
     public:
@@ -116,7 +89,7 @@ Dialog_Workspaces::Dialog_Workspaces(Gtk::Dialog::BaseObjectType* cobject, const
 //		row[ws_cols.col_name] = "ui";
 //		workspace_model->append()->set_value(0, Glib::ustring("ui"));
 
-		App::signal_custom_workspaces_changed().connect(sigc::mem_fun(*this, &Dialog_Workspaces::rebuild_list));
+		MainWindow::signal_custom_workspaces_changed().connect(sigc::mem_fun(*this, &Dialog_Workspaces::rebuild_list));
 
 		rebuild_list();
 	}
@@ -124,7 +97,7 @@ Dialog_Workspaces::Dialog_Workspaces(Gtk::Dialog::BaseObjectType* cobject, const
 
 Dialog_Workspaces* Dialog_Workspaces::create(Gtk::Window& parent)
 {
-	auto refBuilder = load_interface();
+	auto refBuilder = ResourceHelper::load_interface("dialog_workspaces.glade");
 	if (!refBuilder)
 		return nullptr;
 	Dialog_Workspaces * dialog = nullptr;
@@ -158,13 +131,13 @@ void Dialog_Workspaces::on_delete_clicked()
 	// get_selected_rows() return TreePath not TreeIter
 	// So, deleting an item, invalidates the other TreePaths (they point to wrong items)
 	std::vector<std::string> names;
-	for (auto selected_path : current_selection->get_selected_rows()) {
+	for (const auto& selected_path : current_selection->get_selected_rows()) {
 		std::string name;
 		workspace_model->get_iter(selected_path)->get_value(0, name);
 		names.push_back(name);
 	}
 	for (const std::string & name : names) {
-		App::get_workspace_handler()->remove_workspace(name);
+		MainWindow::get_workspace_handler()->remove_workspace(name);
 	}
 }
 
@@ -210,23 +183,26 @@ void Dialog_Workspaces::on_rename_clicked()
 	if (old_name == name)
 		return;
 
-	if (App::get_workspace_handler()->has_workspace(name)) {
+	if (MainWindow::get_workspace_handler()->has_workspace(name)) {
 		Gtk::MessageDialog error_dlg(dialog, _("There is already a workspace with this name."), false, Gtk::MESSAGE_ERROR, Gtk::BUTTONS_OK);
 		error_dlg.run();
 		return;
 	}
 
 	std::string tpl;
-	App::get_workspace_handler()->get_workspace(old_name, tpl);
-	App::get_workspace_handler()->remove_workspace(old_name);
-	App::get_workspace_handler()->add_workspace(name, tpl);
+	MainWindow::get_workspace_handler()->get_workspace(old_name, tpl);
+	MainWindow::get_workspace_handler()->remove_workspace(old_name);
+	MainWindow::get_workspace_handler()->add_workspace(name, tpl);
 }
 
 void Dialog_Workspaces::rebuild_list()
 {
 	workspace_model->clear();
 
-	WorkspaceHandler *workspaces = App::get_workspace_handler();
+	WorkspaceHandler* workspaces = MainWindow::get_workspace_handler();
+	if (!workspaces)
+		return;
+
 	std::vector<std::string> names;
 	workspaces->get_name_list(names);
 	for (const std::string & name : names)

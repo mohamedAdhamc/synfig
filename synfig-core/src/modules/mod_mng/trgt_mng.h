@@ -56,6 +56,8 @@
 
 #include <libmng.h>
 
+#include <synfig/smartfile.h>
+
 /* === M A C R O S ========================================================= */
 
 /* === T Y P E D E F S ===================================================== */
@@ -68,15 +70,15 @@ class mng_trgt : public synfig::Target_Scanline
 
 private:
 
-	FILE *file;
+	synfig::SmartFILE file;
 	int w,h;
 	mng_handle mng;
 
 	bool multi_image,ready;
 	int imagecount;
-	synfig::String filename;
-	unsigned char *buffer;
-	synfig::Color *color_buffer;
+	synfig::filesystem::Path filename;
+	std::vector<unsigned char> buffer;
+	std::vector<synfig::Color> color_buffer;
 
 	z_stream zstream;
 	unsigned char* zbuffer;
@@ -84,16 +86,17 @@ private:
 
 public:
 
-	mng_trgt(const char *filename, const synfig::TargetParam& /* params */);
+	mng_trgt(const synfig::filesystem::Path& filename, const synfig::TargetParam& /* params */);
 	virtual ~mng_trgt();
 
-	virtual bool set_rend_desc(synfig::RendDesc *desc);
-	virtual bool init(synfig::ProgressCallback *cb);
-	virtual bool start_frame(synfig::ProgressCallback *cb);
-	virtual void end_frame();
+	bool set_rend_desc(synfig::RendDesc* desc) override;
+	bool init(synfig::ProgressCallback* cb) override;
 
-	virtual synfig::Color * start_scanline(int scanline);
-	virtual bool end_scanline();
+	bool start_frame(synfig::ProgressCallback* cb) override;
+	void end_frame() override;
+
+	synfig::Color* start_scanline(int scanline) override;
+	bool end_scanline() override;
 };
 
 /* === E N D =============================================================== */

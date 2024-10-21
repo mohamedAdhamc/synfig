@@ -69,9 +69,10 @@ public:
 	Gtk::TreeView * get_params_view() const;
 	Glib::RefPtr<LayerParamTreeStore> get_params_model() const;
 
-	bool use_canvas_view(etl::loose_handle<CanvasView> canvas_view);
+	bool use_canvas_view(CanvasView::LooseHandle canvas_view);
 
 	void delete_selected();
+	void interpolate_selected(synfig::Interpolation type);
 	bool move_selected(synfig::Time delta_time);
 	//! Duplicate selected waypoints and move them delta_time
 	bool copy_selected(synfig::Time delta_time);
@@ -81,6 +82,8 @@ public:
 	void goto_next_waypoint(long n);
 	//! \param n : how many waypoints to skip back
 	void goto_previous_waypoint(long n);
+
+	int get_num_waypoints_selected() { return waypoint_sd.get_selected_items().size(); };
 
 	sigc::signal<void, synfigapp::ValueDesc, std::set<synfig::Waypoint,std::less<synfig::UniqueID> >, int>& signal_waypoint_clicked() { return signal_waypoint_clicked_; }
 	sigc::signal<void, synfigapp::ValueDesc, std::set<synfig::Waypoint,std::less<synfig::UniqueID> >, int>& signal_waypoint_double_clicked() { return signal_waypoint_double_clicked_; }
@@ -95,6 +98,7 @@ public:
 	ActionState get_action_state() const;
 	void set_action_state(ActionState action_state);
 	sigc::signal<void>& signal_action_state_changed() { return signal_action_state_changed_; }
+	sigc::signal<void, bool> signal_waypoint_selection_changed() { return signal_waypoint_selection_changed_; };
 
 protected:
 	virtual bool on_event(GdkEvent* event) override;
@@ -214,13 +218,16 @@ private:
 	void update_param_list_geometries();
 
 	void draw_static_intervals_for_row(const Cairo::RefPtr<Cairo::Context> &cr, const RowInfo &row_info, const std::vector<std::pair<synfig::TimePoint, synfig::Time>> &waypoints) const;
+	void draw_discrete_animated_times(const Cairo::RefPtr<Cairo::Context> &cr, const RowInfo &row_info) const;
 	void draw_waypoints(const Cairo::RefPtr<Cairo::Context> &cr, const Gtk::TreePath &path, const RowInfo &row_info, const std::vector<std::pair<synfig::TimePoint, synfig::Time>> &waypoints) const;
-	void draw_selected_background(const Cairo::RefPtr<Cairo::Context> &cr, const Gtk::TreePath &path, const RowInfo &row_info) const;
+	void draw_selected_background(const Cairo::RefPtr<Cairo::Context> &cr, const Gtk::TreePath &path, const RowInfo &row_info, bool use_selected_color_from_parameter_tree) const;
+	void draw_active_point_status(const Cairo::RefPtr<Cairo::Context> &cr, const RowInfo &row_info, const synfigapp::ValueDesc &value_desc);
 
 	bool fetch_waypoints(const WaypointItem &wi, std::set<synfig::Waypoint, std::less<synfig::UniqueID> > &waypoint_set) const;
 	void on_waypoint_clicked(const WaypointItem &wi, unsigned int button, Gdk::Point /*point*/);
 	void on_waypoint_double_clicked(const WaypointItem &wi, unsigned int button, Gdk::Point /*point*/);
 	void on_waypoint_action_changed();
+	void on_waypoint_selection_changed();
 
 	void on_params_store_row_inserted(const Gtk::TreeModel::Path&, const Gtk::TreeModel::iterator&);
 	void on_params_store_row_deleted(const Gtk::TreeModel::Path&);
@@ -234,6 +241,7 @@ private:
 	sigc::signal<void, synfigapp::ValueDesc, std::set<synfig::Waypoint,std::less<synfig::UniqueID> >, int> signal_waypoint_double_clicked_;
 
 	sigc::signal<void> signal_action_state_changed_;
+	sigc::signal<void, bool> signal_waypoint_selection_changed_;
 
 	ActionState action_state;
 

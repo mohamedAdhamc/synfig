@@ -41,24 +41,22 @@
 #include "valuenode_const.h"
 #include <stdexcept>
 #include <synfig/color.h>
+#include <synfig/misc.h>
 #include <synfig/vector.h>
 #include <synfig/time.h>
 #include <synfig/angle.h>
-#include <ETL/misc>
-#include <ETL/stringf>
 
 #endif
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 
 /* === M A C R O S ========================================================= */
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Scale, RELEASE_VERSION_0_61_06, "scale", "Scale")
+REGISTER_VALUENODE(ValueNode_Scale, RELEASE_VERSION_0_61_06, "scale", N_("Scale"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -67,8 +65,7 @@ REGISTER_VALUENODE(ValueNode_Scale, RELEASE_VERSION_0_61_06, "scale", "Scale")
 ValueNode_Scale::ValueNode_Scale(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	set_link("scalar",ValueNode::Handle(ValueNode_Const::create(Real(1.0))));
 	Type &type(value.get_type());
 
@@ -120,8 +117,8 @@ synfig::ValueNode_Scale::~ValueNode_Scale()
 synfig::ValueBase
 synfig::ValueNode_Scale::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	if(!value_node || !scalar)
 		throw std::runtime_error(strprintf("ValueNode_Scale: %s",_("One or both of my parameters aren't set!")));
@@ -240,12 +237,12 @@ ValueNode_Scale::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"link")
+	ret.push_back(ParamDesc("link")
 		.set_local_name(_("Link"))
 		.set_description(_("The value node used to scale"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"scalar")
+	ret.push_back(ParamDesc("scalar")
 		.set_local_name(_("Scalar"))
 		.set_description(_("Value that multiplies the value node"))
 	);

@@ -34,7 +34,6 @@
 
 #include <synfig/general.h>
 
-#include <gtkmm/stock.h>
 #include "widgets/widget_link.h"
 
 #endif
@@ -52,67 +51,83 @@ using namespace studio;
 /* === M E T H O D S ======================================================= */
 
 
-
-namespace studio {
+Widget_Link::Widget_Link()
+	: ObjectBase    ("widget_link")
+	, value_active  (*this, "tooltip_active"  , "Unlink")
+	, value_inactive(*this, "tooltip_inactive", "Link")
+{
+	init();
+}
 
 Widget_Link::Widget_Link(const std::string &tlt_inactive, const std::string &tlt_active)
+	: ObjectBase    ("widget_link")
+	, value_active  (*this, "tooltip_active"  , tlt_active)
+	, value_inactive(*this, "tooltip_inactive", tlt_inactive)
 {
-	const Glib::RefPtr<Gtk::StyleContext> context = get_style_context();
-
-	// hardfixed icon size. chain icon is not a square but a rectangle.
-	Glib::RefPtr<Gtk::IconSet> chain_icon = Gtk::IconSet::lookup_default(Gtk::StockID("synfig-utils_chain_link_off"));
-	Glib::RefPtr<Gdk::Pixbuf> chain_icon_pixbuff = chain_icon->render_icon_pixbuf(context, (Gtk::IconSize)-1);
-	Glib::RefPtr<Gdk::Pixbuf> chain_icon_pixbuff_scaled = chain_icon_pixbuff->scale_simple(16, 32, Gdk::INTERP_BILINEAR);
-	// not use manage() otherwise the not-shown icon at exit wouldn't be deleted...
-	icon_off_ = new Gtk::Image(chain_icon_pixbuff_scaled);
-
-	chain_icon = Gtk::IconSet::lookup_default(Gtk::StockID("synfig-utils_chain_link_on"));
-	chain_icon_pixbuff_scaled = chain_icon->render_icon_pixbuf(context, (Gtk::IconSize)-1)->scale_simple(16, 32, Gdk::INTERP_BILINEAR);
-	// not use manage() otherwise the not-shown icon at exit wouldn't be deleted...
-	icon_on_ = new Gtk::Image(chain_icon_pixbuff_scaled);
-
-	icon_off_->set_margin_start(0);
-	icon_off_->set_margin_end(0);
-	icon_off_->set_margin_top(0);
-	icon_off_->set_margin_bottom(0);
-	icon_on_->set_margin_start(0);
-	icon_on_->set_margin_end(0);
-	icon_on_->set_margin_top(0);
-	icon_on_->set_margin_bottom(0);
-
-	icon_off_->show();
-	add(*icon_off_);
-	set_relief(Gtk::RELIEF_NONE);
-
-	tooltip_inactive_ = tlt_inactive;
-	tooltip_active_ = tlt_active;
-	set_tooltip_text(tooltip_inactive_);
+	init();
 }
 
-Widget_Link::~Widget_Link() {
-	delete icon_on_;
-	delete icon_off_;
-}
-
-}
-
-
-void Widget_Link::on_toggled()
+Widget_Link::Widget_Link(BaseObjectType *cobject)
+	: ObjectBase    ("widget_link")
+	, ToggleButton  (cobject)
+	, value_active  (*this, "tooltip_active"  , "Unlink")
+	, value_inactive(*this, "tooltip_inactive", "Link")
 {
-	Gtk::Image *icon;
+	init();
+}
 
-	if(get_active())
-	{
-		icon= icon_on_;
-		set_tooltip_text(tooltip_active_);
+Widget_Link::Widget_Link(BaseObjectType *cobject, const Glib::RefPtr<Gtk::Builder> &builder)
+	: ObjectBase    ("widget_link")
+	, ToggleButton  (cobject)
+	, builder       (builder)
+	, value_active  (*this, "tooltip_active"  , "Unlink")
+	, value_inactive(*this, "tooltip_inactive", "Link")
+{
+	init();
+}
+
+Widget_Link::~Widget_Link() = default;
+
+void
+Widget_Link::init()
+{
+	on_toggled();
+}
+
+
+void
+Widget_Link::on_toggled()
+{
+	// refresh icon & tool-tip text
+	if (get_active()) {
+		set_image_from_icon_name("utils_chain_link_on_icon", Gtk::BuiltinIconSize::ICON_SIZE_BUTTON);
+		set_tooltip_text(property_tooltip_active().get_value());
+	} else {
+		set_image_from_icon_name("utils_chain_link_off_icon", Gtk::BuiltinIconSize::ICON_SIZE_BUTTON);
+		set_tooltip_text(property_tooltip_inactive().get_value());
 	}
+}
+
+GType Widget_Link::gtype = 0;
+
+Glib::ObjectBase
+*Widget_Link::wrap_new(GObject *o)
+{
+	if (gtk_widget_is_toplevel(GTK_WIDGET(o)))
+		return new Widget_Link(GTK_TOGGLE_BUTTON(o));
 	else
-	{
-		icon=icon_off_;
-		set_tooltip_text(tooltip_inactive_);
-	}
+		return manage(new Widget_Link(GTK_TOGGLE_BUTTON(o)));
+}
 
-	remove();
-	add(*icon);
-	icon->show();
+void
+Widget_Link::register_type()
+{
+	if(gtype)
+		return;
+
+	Widget_Link dummy;
+
+	gtype = G_OBJECT_TYPE(dummy.gobj());
+
+	wrap_register(gtype, Widget_Link::wrap_new);
 }

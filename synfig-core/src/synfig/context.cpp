@@ -63,11 +63,11 @@ using namespace synfig;
 /* === G L O B A L S ======================================================= */
 
 #ifdef SYNFIG_PROFILE_LAYERS
-#include <ETL/clock>
+#include <synfig/clock.h>
 static int depth(0);
 static std::map<String,float> time_table;
 static std::map<String,int> run_table;
-static etl::clock profile_timer;
+static synfig::clock profile_timer;
 static String curr_layer;
 static void
 _print_profile_report()
@@ -232,7 +232,7 @@ Context::get_full_bounding_rect()const
 */
 
 
-etl::handle<Layer>
+Layer::Handle
 Context::hit_check(const Point &pos)const
 {
 	Context context(*this);
@@ -312,7 +312,8 @@ Context::accelerated_render(Surface *surface,int quality, const RendDesc &rendde
 			!composite->reads_context())
 		{
 			Layer::Handle layer = *context;
-			while (!context->empty()) context++; // skip the context
+			while (!context->empty())
+				++context; // skip the context
 			return layer->accelerated_render(context,surface,quality,renddesc, cb);
 		}
 		// Break out of the loop--we have found a good layer

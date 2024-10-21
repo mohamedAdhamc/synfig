@@ -74,7 +74,6 @@
 
 #endif
 
-using namespace etl;
 using namespace synfig;
 using namespace synfigapp;
 using namespace Action;
@@ -572,7 +571,12 @@ Action::ValueDescSet::prepare()
 	// allowed position.
 	if (ValueNode_BLineCalcVertex::Handle bline_vertex = ValueNode_BLineCalcVertex::Handle::cast_dynamic(value_desc.get_value_node()))
 	{
-		ValueNode_BLine::Handle bline = ValueNode_BLine::Handle::cast_dynamic(bline_vertex->get_link("bline"));
+		bool bline_loop = false;
+		ValueNode::LooseHandle bline = bline_vertex->get_bline_handle(bline_loop);
+		if (!bline) {
+			warning(_("Internal error: ValueDescSet: It is a BLine Vertex, but it has not a BLine link"));
+			return;
+		}
 		Real radius = 0.0;
 		Real new_amount;
 		if (((*(bline_vertex->get_link("loop")))(time).get(bool())))
@@ -582,7 +586,7 @@ Action::ValueDescSet::prepare()
 			// not change drastically.
 			Real amount_old((*(bline_vertex->get_link("amount")))(time).get(Real()));
 
-			Real amount_new = synfig::find_closest_point((*bline)(time), value.get(Vector()), radius, bline->get_loop());
+			Real amount_new = synfig::find_closest_point((*bline)(time), value.get(Vector()), radius, bline_loop);
 			Real difference = fmod( fmod(amount_new - amount_old, 1.0) + 1.0 , 1.0);
 			//fmod is called twice to avoid negative values
 			if (difference > 0.5)
@@ -590,10 +594,10 @@ Action::ValueDescSet::prepare()
 			new_amount = amount_old+difference;
 		}
 		else
-			new_amount = synfig::find_closest_point((*bline)(time), value.get(Vector()), radius, bline->get_loop());
+			new_amount = synfig::find_closest_point((*bline)(time), value.get(Vector()), radius, bline_loop);
 		bool homogeneous((*(bline_vertex->get_link("homogeneous")))(time).get(bool()));
 		if(homogeneous)
-			new_amount=std_to_hom((*bline)(time), new_amount, (*(bline_vertex->get_link("loop")))(time).get(bool()), bline->get_loop() );
+			new_amount=std_to_hom((*bline)(time), new_amount, (*(bline_vertex->get_link("loop")))(time).get(bool()), bline_loop );
 		add_action_valuedescset(new_amount,ValueDesc(bline_vertex, bline_vertex->get_link_index_from_name("amount")));
 		return;
 	}
@@ -673,18 +677,11 @@ Action::ValueDescSet::prepare()
 				bool blineloop(bline->get_loop());
 				// Retrieve the homogeneous layer parameter
 				bool homogeneous=false;
-				Layer::Handle layer_parent;
-				std::set<Node*>::iterator iter;
-				for(iter=wplist->parent_set.begin();iter!=wplist->parent_set.end();++iter)
-					{
-						Layer::Handle layer;
-						layer=Layer::Handle::cast_dynamic(*iter);
-						if(layer && layer->get_name() == "advanced_outline")
-						{
-							homogeneous=layer->get_param("homogeneous").get(bool());
-							break;
-						}
-					}
+				Layer::Handle layer_parent = wplist->find_first_parent_of_type<Layer>([](const Layer::Handle& layer) -> bool {
+					return layer->get_name() == "advanced_outline";
+				});
+				if(layer_parent)
+					homogeneous=layer_parent->get_param("homogeneous").get(bool());
 				Real radius = 0.0;
 				Real new_amount;
 				WidthPoint wp((*wpoint_composite)(time).get(WidthPoint()));
@@ -931,8 +928,7 @@ Action::ValueDescSet::prepare()
 					}
 
 					synfig::ValueNode_Animated::WaypointList::const_iterator iter;
-					for(iter=animated->waypoint_list().begin(); iter<animated->waypoint_list().end(); iter++)
-					{
+					for (iter = animated->waypoint_list().begin(); iter < animated->waypoint_list().end(); ++iter) {
 						waypoint=*iter;
 						ValueBase waypoint_value(waypoint.get_value());
 						if (type == type_integer)

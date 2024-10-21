@@ -32,8 +32,6 @@
 
 #include <synfig/target_scanline.h>
 #include <synfig/string.h>
-#include <synfig/targetparam.h>
-#include <cstdio>
 
 #include <vector>
 
@@ -57,39 +55,43 @@ private:
 
 	int width, height;
 
-	synfig::String filename;
-	unsigned char *buffer1, *start_pointer, *buffer_pointer;
-	unsigned char *buffer2, *previous_buffer_pointer;
+	synfig::filesystem::Path filename;
+	std::vector<unsigned char> buffer1, buffer2;
+	unsigned char* buffer_pointer;
+	unsigned char* current_row_buffer_pointer;
+	unsigned char* previous_row_buffer_pointer;
 	bool transparent;
-	synfig::Color *color_buffer;
+	bool is_gif;
+	std::vector<synfig::Color> color_buffer;
 	std::vector<Magick::Image> images;
 	synfig::String sequence_separator;
 
 public:
 
-	magickpp_trgt(const char *filename, const synfig::TargetParam &params):
+	magickpp_trgt(const synfig::filesystem::Path& filename, const synfig::TargetParam& params):
 		width(),
 		height(),
 		filename(filename),
-		buffer1(NULL),
-		start_pointer(NULL),
-		buffer_pointer(NULL),
-		buffer2(NULL),
-		previous_buffer_pointer(NULL),
+		buffer_pointer(nullptr),
+		current_row_buffer_pointer(nullptr),
+		previous_row_buffer_pointer(nullptr),
 		transparent(),
-		color_buffer(NULL),
+		is_gif(false),
 		sequence_separator(params.sequence_separator)
-	{ }
+	{
+		// todo(ice0): fix portable build
+		Magick::InitializeMagick(nullptr);
+	}
 	virtual ~magickpp_trgt();
 
-	virtual bool set_rend_desc(synfig::RendDesc *desc);
-	virtual bool init(synfig::ProgressCallback *cb);
+	bool set_rend_desc(synfig::RendDesc* desc) override;
+	bool init(synfig::ProgressCallback* cb) override;
 
-	virtual bool start_frame(synfig::ProgressCallback *cb);
-	virtual void end_frame();
+	bool start_frame(synfig::ProgressCallback* cb) override;
+	void end_frame() override;
 
-	virtual synfig::Color* start_scanline(int scanline);
-	virtual bool end_scanline();
+	synfig::Color* start_scanline(int scanline) override;
+	bool end_scanline() override;
 };
 
 /* === E N D =============================================================== */

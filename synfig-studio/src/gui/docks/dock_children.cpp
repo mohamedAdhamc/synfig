@@ -58,7 +58,9 @@ using namespace studio;
 Dock_Children::Dock_Children():
 	Dock_CanvasSpecific("children",_("Library"),"library_icon")
 {
-    //! \todo the combination of set_use_scrolled(false) and
+	set_name("library_panel");
+
+	//! \todo the combination of set_use_scrolled(false) and
 	//!       add(*tree_view) causes crashes when
 	//!       Dockable::prev_widget_ is left referencing a
 	//!       ChildrenTree that has already been destroyed.
@@ -70,7 +72,7 @@ Dock_Children::~Dock_Children()
 }
 
 void
-Dock_Children::init_canvas_view_vfunc(etl::loose_handle<CanvasView> canvas_view)
+Dock_Children::init_canvas_view_vfunc(CanvasView::LooseHandle canvas_view)
 {
 	Glib::RefPtr<ChildrenTreeStore> children_tree_store;
 	children_tree_store=ChildrenTreeStore::create(canvas_view->canvas_interface());
@@ -84,7 +86,7 @@ Dock_Children::init_canvas_view_vfunc(etl::loose_handle<CanvasView> canvas_view)
 }
 
 void
-Dock_Children::changed_canvas_view_vfunc(etl::loose_handle<CanvasView> canvas_view)
+Dock_Children::changed_canvas_view_vfunc(CanvasView::LooseHandle canvas_view)
 {
 	if(canvas_view)
 	{

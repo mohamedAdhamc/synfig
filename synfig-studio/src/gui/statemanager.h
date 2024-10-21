@@ -30,7 +30,8 @@
 
 /* === H E A D E R S ======================================================= */
 
-#include <glibmm/refptr.h>
+#include <gtkmm/radioaction.h>
+
 #include <gui/smach.h>
 #include <vector>
 
@@ -40,8 +41,6 @@
 
 /* === C L A S S E S & S T R U C T S ======================================= */
 
-namespace Gtk { class ActionGroup; }
-
 typedef unsigned int guint;
 
 namespace studio {
@@ -49,11 +48,12 @@ namespace studio {
 {
 private:
 	Glib::RefPtr<Gtk::ActionGroup> state_group;
+	Gtk::RadioAction::Group radio_action_group;
 
 	guint merge_id;
 	std::vector<guint> merge_id_list;
 
-	void change_state_(const Smach::state_base *state);
+	void change_state_(const Glib::RefPtr<Gtk::RadioAction>& current, const Smach::state_base* state);
 
 public:
 	StateManager();

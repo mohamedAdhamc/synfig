@@ -46,31 +46,29 @@ namespace synfig {
 */
 class Target_Null : public Target_Scanline
 {
-	Color *buffer;
+	std::vector<Color> buffer;
 
-	Target_Null():buffer(nullptr) { }
+	Target_Null() { }
 
 public:
 
-	~Target_Null() { delete[] buffer; }
+	~Target_Null() { }
 
-	virtual bool start_frame(ProgressCallback */*cb*/=NULL) {
-	    if (buffer) delete[] buffer;
-	    buffer = new Color[desc.get_w()*sizeof(Color)];
+	bool start_frame(ProgressCallback* /*cb*/ = nullptr) override {
+		buffer.resize(desc.get_w());
 	    return true;
 	}
 
-	virtual void end_frame() {
-	    if (buffer) delete[] buffer;
-	    buffer = nullptr;
+	void end_frame() override {
+		buffer.clear();
 	    return;
 	}
 
-	virtual Color * start_scanline(int /*scanline*/) { return buffer; }
+	Color* start_scanline(int /*scanline*/) override { return buffer.data(); }
 
-	virtual bool end_scanline() { return true; }
+	bool end_scanline() override { return true; }
 
-	static Target* create(const char */*filename*/=0) { return new Target_Null(); }
+	static Target* create(const synfig::filesystem::Path& /*filename*/, const synfig::TargetParam&) { return new Target_Null(); }
 }; // END of class Target_Null
 
 }; // END of namespace synfig

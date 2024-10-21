@@ -35,21 +35,17 @@
 #endif
 
 #include "savecanvas.h"
+
 #include "general.h"
 #include <synfig/localization.h>
 #include "valuenode.h"
 #include "valuenode_registry.h"
 #include "valuenodes/valuenode_animated.h"
 #include "valuenodes/valuenode_const.h"
-#include "valuenodes/valuenode_linear.h"
 #include "valuenodes/valuenode_staticlist.h"
 #include "valuenodes/valuenode_dynamiclist.h"
-#include "valuenodes/valuenode_reference.h"
-#include "valuenodes/valuenode_subtract.h"
 #include "valuenodes/valuenode_bline.h"
 #include "valuenodes/valuenode_bone.h"
-#include "valuenodes/valuenode_wplist.h"
-#include "valuenodes/valuenode_dilist.h"
 #include "dashitem.h"
 #include "time.h"
 #include "keyframe.h"
@@ -72,7 +68,6 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 
 /* === M A C R O S ========================================================= */
@@ -84,7 +79,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-ReleaseVersion save_canvas_version = ReleaseVersion(RELEASE_VERSION_END-1);
+ReleaseVersion save_canvas_version = synfig::RELEASE_VERSION_CURRENT;
 int valuenode_too_new_count;
 save_canvas_external_file_callback_t save_canvas_external_file_callback = nullptr;
 void *save_canvas_external_file_user_data = nullptr;
@@ -253,10 +248,8 @@ xmlpp::Element* encode_dash_item(xmlpp::Element* root, DashItem dash_item)
 xmlpp::Element* encode_gradient(xmlpp::Element* root,Gradient x)
 {
 	root->set_name("gradient");
-	Gradient::const_iterator iter;
 	x.sort();
-	for(iter=x.begin();iter!=x.end();iter++)
-	{
+	for (Gradient::const_iterator iter = x.begin(); iter != x.end(); ++iter) {
 		xmlpp::Element *cpoint(encode_color(root->add_child("color"),iter->color));
 		cpoint->set_attribute("pos",strprintf("%f",iter->pos));
 	}
@@ -307,7 +300,7 @@ xmlpp::Element* encode_pair(xmlpp::Element* root,types_namespace::TypePairBase &
 
 xmlpp::Element* encode_value(xmlpp::Element* root,const ValueBase &data,Canvas::ConstHandle canvas)
 {
-	if (getenv("SYNFIG_DEBUG_SAVE_CANVAS")) printf("%s:%d encode_value (type %s)\n", __FILE__, __LINE__, data.get_type().description.name.c_str());
+	DEBUG_LOG("SYNFIG_DEBUG_SAVE_CANVAS", "%s:%d encode_value (type %s)\n", __FILE__, __LINE__, data.get_type().description.name.c_str());
 	Type &type(data.get_type());
 	if (type == type_real)
 	{
@@ -495,47 +488,9 @@ xmlpp::Element* encode_animated(xmlpp::Element* root,ValueNode_Animated::ConstHa
 }
 
 
-xmlpp::Element* encode_subtract(xmlpp::Element* root,ValueNode_Subtract::ConstHandle value_node,Canvas::ConstHandle canvas=nullptr)
-{
-	assert(value_node);
-	root->set_name("subtract");
-
-	ValueNode::ConstHandle lhs=value_node->get_lhs();
-	ValueNode::ConstHandle rhs=value_node->get_rhs();
-	ValueNode::ConstHandle scalar=value_node->get_scalar();
-
-	assert(lhs);
-	assert(rhs);
-
-	root->set_attribute("type",value_node->get_type().description.name);
-
-	if(lhs==rhs)
-		warning("LHS is equal to RHS, this <subtract> will always be zero!");
-
-	//if(value_node->get_scalar()!=1)
-	//	root->set_attribute("scalar",strprintf(VECTOR_VALUE_TYPE_FORMAT,value_node->get_scalar()));
-
-	if(!scalar->get_id().empty())
-		root->set_attribute("scalar",scalar->get_relative_id(canvas));
-	else
-		encode_value_node(root->add_child("scalar")->add_child("value_node"),scalar,canvas);
-
-	if(!lhs->get_id().empty())
-		root->set_attribute("lhs",lhs->get_relative_id(canvas));
-	else
-		encode_value_node(root->add_child("lhs")->add_child("value_node"),lhs,canvas);
-
-	if(!rhs->get_id().empty())
-		root->set_attribute("rhs",rhs->get_relative_id(canvas));
-	else
-		encode_value_node(root->add_child("rhs")->add_child("value_node"),rhs,canvas);
-
-	return root;
-}
-
 xmlpp::Element* encode_static_list(xmlpp::Element* root,ValueNode_StaticList::ConstHandle value_node,Canvas::ConstHandle canvas=nullptr)
 {
-	if (getenv("SYNFIG_DEBUG_SAVE_CANVAS")) printf("%s:%d encode_static_list %s\n", __FILE__, __LINE__, value_node->get_string().c_str());
+	DEBUG_LOG("SYNFIG_DEBUG_SAVE_CANVAS", "%s:%d encode_static_list %s\n", __FILE__, __LINE__, value_node->get_string().c_str());
 	assert(value_node);
 
 	root->set_name(value_node->get_name());
@@ -552,12 +507,12 @@ xmlpp::Element* encode_static_list(xmlpp::Element* root,ValueNode_StaticList::Co
 			entry_node->set_attribute("use",(*iter)->get_relative_id(canvas));
 		else
 		{
-			if (getenv("SYNFIG_DEBUG_SAVE_CANVAS")) printf("%s:%d encode entry %s\n", __FILE__, __LINE__, (*iter)->get_string().c_str());
+			DEBUG_LOG("SYNFIG_DEBUG_SAVE_CANVAS", "%s:%d encode entry %s\n", __FILE__, __LINE__, (*iter)->get_string().c_str());
 			encode_value_node(entry_node->add_child("value_node"),*iter,canvas);
 		}
 	}
 
-	if (getenv("SYNFIG_DEBUG_SAVE_CANVAS")) printf("%s:%d encode_static_list %s done\n", __FILE__, __LINE__, value_node->get_string().c_str());
+	DEBUG_LOG("SYNFIG_DEBUG_SAVE_CANVAS", "%s:%d encode_static_list %s done\n", __FILE__, __LINE__, value_node->get_string().c_str());
 	return root;
 }
 
@@ -659,12 +614,12 @@ xmlpp::Element* encode_dynamic_list(xmlpp::Element* root,ValueNode_DynamicList::
 // Generic linkable data node entry
 xmlpp::Element* encode_linkable_value_node(xmlpp::Element* root,LinkableValueNode::ConstHandle value_node,Canvas::ConstHandle canvas=nullptr)
 {
-	if (getenv("SYNFIG_DEBUG_SAVE_CANVAS")) printf("%s:%d encode_linkable_value_node %s\n", __FILE__, __LINE__, value_node->get_string().c_str());
+	DEBUG_LOG("SYNFIG_DEBUG_SAVE_CANVAS", "%s:%d encode_linkable_value_node %s\n", __FILE__, __LINE__, value_node->get_string().c_str());
 	assert(value_node);
 
 	String name(value_node->get_name());
 	ReleaseVersion saving_version(get_file_version());
-	ReleaseVersion feature_version(ValueNodeRegistry::book()[name].release_version);
+	ReleaseVersion feature_version(ValueNodeRegistry::book().at(name).release_version);
 
 	if (saving_version < feature_version)
 	{
@@ -681,10 +636,9 @@ xmlpp::Element* encode_linkable_value_node(xmlpp::Element* root,LinkableValueNod
 
 	root->set_attribute("type",value_node->get_type().description.name);
 
-	int i;
 	synfig::ParamVocab child_vocab(value_node->get_children_vocab());
 	synfig::ParamVocab::iterator iter(child_vocab.begin());
-	for(i=0;i<value_node->link_count();i++, iter++)
+	for (int i = 0; i < value_node->link_count(); ++i, ++iter)
 	{
 		// printf("saving link %d : %s\n", i, value_node->link_local_name(i).c_str());
 		ValueNode::ConstHandle link=value_node->get_link(i).constant();
@@ -696,35 +650,32 @@ xmlpp::Element* encode_linkable_value_node(xmlpp::Element* root,LinkableValueNod
 		{
 			if (name == "bone" && value_node->link_name(i) == "parent")
 			{
-				if (getenv("SYNFIG_DEBUG_SAVE_CANVAS")) printf("%s:%d saving bone's parent\n", __FILE__, __LINE__);
+				DEBUG_LOG("SYNFIG_DEBUG_SAVE_CANVAS", "%s:%d saving bone's parent\n", __FILE__, __LINE__);
 			}
 			encode_value_node(root->add_child(value_node->link_name(i))->add_child("value_node"),link,canvas);
 		}
 	}
 
-	if (getenv("SYNFIG_DEBUG_SAVE_CANVAS")) printf("%s:%d encode_linkable_value_node %s done\n", __FILE__, __LINE__, value_node->get_string().c_str());
+	DEBUG_LOG("SYNFIG_DEBUG_SAVE_CANVAS", "%s:%d encode_linkable_value_node %s done\n", __FILE__, __LINE__, value_node->get_string().c_str());
 	return root;
 }
 
 xmlpp::Element* encode_value_node(xmlpp::Element* root,ValueNode::ConstHandle value_node,Canvas::ConstHandle canvas)
 {
 	assert(value_node);
-	if (getenv("SYNFIG_DEBUG_SAVE_CANVAS")) printf("%s:%d encode_value_node %s %s\n", __FILE__, __LINE__, value_node->get_string().c_str(), value_node->get_guid().get_string().c_str());
+	DEBUG_LOG("SYNFIG_DEBUG_SAVE_CANVAS", "%s:%d encode_value_node %s %s\n", __FILE__, __LINE__, value_node->get_string().c_str(), value_node->get_guid().get_string().c_str());
 
 	if(value_node->rcount()>1)
 		root->set_attribute("guid",(value_node->get_guid()^canvas->get_root()->get_guid()).get_string());
 
 	if(ValueNode_Bone::ConstHandle value_node_bone = ValueNode_Bone::ConstHandle::cast_dynamic(value_node))
 	{
-		if (getenv("SYNFIG_DEBUG_SAVE_CANVAS")) printf("%s:%d shortcutting for valuenode_bone\n", __FILE__, __LINE__);
+		DEBUG_LOG("SYNFIG_DEBUG_SAVE_CANVAS", "%s:%d shortcutting for valuenode_bone\n", __FILE__, __LINE__);
 		encode_value_node_bone_id(root, value_node_bone,canvas);
 	}
 	else
 	if (ValueNode_Animated::ConstHandle animated_value_node = ValueNode_Animated::ConstHandle::cast_dynamic(value_node))
 		encode_animated(root,animated_value_node,canvas);
-	else
-	if (ValueNode_Subtract::ConstHandle subtract_value_node = ValueNode_Subtract::ConstHandle::cast_dynamic(value_node))
-		encode_subtract(root,subtract_value_node,canvas);
 	else
 	if (ValueNode_StaticList::ConstHandle static_list_value_node = ValueNode_StaticList::ConstHandle::cast_dynamic(value_node))
 		encode_static_list(root,static_list_value_node,canvas);
@@ -736,7 +687,7 @@ xmlpp::Element* encode_value_node(xmlpp::Element* root,ValueNode::ConstHandle va
 	// if it's a ValueNode_Const
 	else if (ValueNode_Const::ConstHandle const_value_node = ValueNode_Const::ConstHandle::cast_dynamic(value_node))
 	{
-		if (getenv("SYNFIG_DEBUG_SAVE_CANVAS")) printf("%s:%d got ValueNode_Const encoding value\n", __FILE__, __LINE__);
+		DEBUG_LOG("SYNFIG_DEBUG_SAVE_CANVAS", "%s:%d got ValueNode_Const encoding value\n", __FILE__, __LINE__);
 		// encode its get_value()
 		encode_value(root,const_value_node->get_value(),canvas);
 	}
@@ -757,14 +708,14 @@ xmlpp::Element* encode_value_node(xmlpp::Element* root,ValueNode::ConstHandle va
 //	if(ValueNode_Bone::ConstHandle::cast_dynamic(value_node))
 //		root->set_attribute("guid",value_node->get_guid().get_string());
 
-	if (getenv("SYNFIG_DEBUG_SAVE_CANVAS")) printf("%s:%d encode_value_node %s done\n", __FILE__, __LINE__, value_node->get_string().c_str());
+	DEBUG_LOG("SYNFIG_DEBUG_SAVE_CANVAS", "%s:%d encode_value_node %s done\n", __FILE__, __LINE__, value_node->get_string().c_str());
 	return root;
 }
 
 xmlpp::Element* encode_value_node_bone(xmlpp::Element* root,ValueNode::ConstHandle value_node,Canvas::ConstHandle canvas)
 {
 	assert(value_node);
-	if (getenv("SYNFIG_DEBUG_SAVE_CANVAS")) printf("%s:%d encode_value_node_bone %s %s\n", __FILE__, __LINE__, value_node->get_string().c_str(), value_node->get_guid().get_string().c_str());
+	DEBUG_LOG("SYNFIG_DEBUG_SAVE_CANVAS", "%s:%d encode_value_node_bone %s %s\n", __FILE__, __LINE__, value_node->get_string().c_str(), value_node->get_guid().get_string().c_str());
 
 	if (ValueNode_Bone::ConstHandle bone_value_node = ValueNode_Bone::ConstHandle::cast_dynamic(value_node))
 		encode_linkable_value_node(root,bone_value_node,canvas);
@@ -790,7 +741,7 @@ xmlpp::Element* encode_value_node_bone(xmlpp::Element* root,ValueNode::ConstHand
 		root->set_attribute("guid",(value_node->get_guid()^canvas->get_root()->get_guid()).get_string());
 	}
 
-	if (getenv("SYNFIG_DEBUG_SAVE_CANVAS")) printf("%s:%d encode_value_node %s done\n", __FILE__, __LINE__, value_node->get_string().c_str());
+	DEBUG_LOG("SYNFIG_DEBUG_SAVE_CANVAS", "%s:%d encode_value_node %s done\n", __FILE__, __LINE__, value_node->get_string().c_str());
 	return root;
 }
 
@@ -798,13 +749,13 @@ xmlpp::Element* encode_value_node_bone_id(xmlpp::Element* root,ValueNode::ConstH
 {
 	root->set_name("bone");
 	root->set_attribute("type",type_bone_object.description.name);
-	if (getenv("SYNFIG_DEBUG_SAVE_CANVAS")) printf("%s:%d encode_value_node_bone_id %s %s\n", __FILE__, __LINE__, value_node->get_string().c_str(), value_node->get_guid().get_string().c_str());
+	DEBUG_LOG("SYNFIG_DEBUG_SAVE_CANVAS", "%s:%d encode_value_node_bone_id %s %s\n", __FILE__, __LINE__, value_node->get_string().c_str(), value_node->get_guid().get_string().c_str());
 	if(!value_node->get_id().empty())
 		root->set_attribute("id",value_node->get_id());
 
 	if(ValueNode_Bone::ConstHandle::cast_dynamic(value_node))
 	{
-		if (getenv("SYNFIG_DEBUG_SAVE_CANVAS")) printf("%s:%d bone guid case 1 guid %s\n", __FILE__, __LINE__, value_node->get_guid().get_string().c_str());
+		DEBUG_LOG("SYNFIG_DEBUG_SAVE_CANVAS", "%s:%d bone guid case 1 guid %s\n", __FILE__, __LINE__, value_node->get_guid().get_string().c_str());
 		root->set_attribute("guid",(value_node->get_guid()^canvas->get_root()->get_guid()).get_string());
 	}
 
@@ -845,7 +796,7 @@ xmlpp::Element* encode_layer(xmlpp::Element* root,Layer::ConstHandle layer)
 			xmlpp::Element *node=root->add_child("param");
 			node->set_attribute("name",iter->get_name());
 
-			handle<const ValueNode> value_node=dynamic_param_list.find(iter->get_name())->second;
+			ValueNode::ConstHandle value_node=dynamic_param_list.find(iter->get_name())->second;
 
 			// If the valuenode has no ID, then it must be defined in-place
 			if(value_node->get_id().empty())
@@ -898,7 +849,7 @@ xmlpp::Element* encode_layer(xmlpp::Element* root,Layer::ConstHandle layer)
 			 && value.get_type() == type_string)
 			{
 				std::string filename( value.get(String()) );
-				std::string ext = filename_extension(filename);
+				std::string ext = filesystem::Path::filename_extension(filename);
 				if (!ext.empty()) ext = ext.substr(1); // skip initial '.'
 				bool registered_in_importer = Importer::book().count(ext) > 0;
 				bool supports_by_importer = registered_in_importer
@@ -1077,7 +1028,9 @@ synfig::save_canvas(const FileSystem::Identifier &identifier, Canvas::ConstHandl
 {
     ChangeLocale change_locale(LC_NUMERIC, "C");
 
-    synfig::String tmp_filename(safe ? identifier.filename+".TMP" : identifier.filename);
+	synfig::String tmp_filename(identifier.filename.u8string());
+	if (safe)
+		tmp_filename.append(".TMP");
 
 	try
 	{
@@ -1093,7 +1046,7 @@ synfig::save_canvas(const FileSystem::Identifier &identifier, Canvas::ConstHandl
 			return false;
 		}
 
-		if (filename_extension(identifier.filename) == ".sifz")
+		if (identifier.filename.extension().u8string() == ".sifz")
 			stream = FileSystem::WriteStream::Handle(new ZWriteStream(stream));
 
 		document.write_to_stream_formatted(*stream, "UTF-8");
@@ -1103,8 +1056,7 @@ synfig::save_canvas(const FileSystem::Identifier &identifier, Canvas::ConstHandl
 
 		if (safe)
 		{
-			if(!identifier.file_system->file_rename(tmp_filename, identifier.filename))
-			{
+			if (!identifier.file_system->file_rename(tmp_filename, identifier.filename.u8string())) {
 				synfig::error("synfig::save_canvas(): Unable to rename file to correct filename");
 				return false;
 			}

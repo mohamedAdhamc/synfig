@@ -46,14 +46,13 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 
 /* === M A C R O S ========================================================= */
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_RadialComposite, RELEASE_VERSION_0_61_06, "radial_composite", "Radial Composite")
+REGISTER_VALUENODE(ValueNode_RadialComposite, RELEASE_VERSION_0_61_06, "radial_composite", N_("Radial Composite"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -62,8 +61,7 @@ REGISTER_VALUENODE(ValueNode_RadialComposite, RELEASE_VERSION_0_61_06, "radial_c
 synfig::ValueNode_RadialComposite::ValueNode_RadialComposite(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	Type &type(get_type());
 	if (type == type_vector)
 	{
@@ -92,7 +90,7 @@ ValueNode_RadialComposite::~ValueNode_RadialComposite()
 }
 
 ValueNode_RadialComposite*
-ValueNode_RadialComposite::create(const ValueBase& value, etl::loose_handle<Canvas>)
+ValueNode_RadialComposite::create(const ValueBase& value, Canvas::LooseHandle)
 {
 	return new ValueNode_RadialComposite(value);
 }
@@ -106,8 +104,8 @@ ValueNode_RadialComposite::create_new()const
 ValueBase
 synfig::ValueNode_RadialComposite::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	Type &type(get_type());
 	if (type == type_vector)
@@ -247,16 +245,16 @@ ValueNode_RadialComposite::get_children_vocab_vfunc()const
 	Type &type(get_type());
 	if (type == type_color)
 	{
-		ret.push_back(ParamDesc(ValueBase(),"y_luma")
+		ret.push_back(ParamDesc("y_luma")
 		.set_local_name(_("Luma"))
 		);
-		ret.push_back(ParamDesc(ValueBase(),"saturation")
+		ret.push_back(ParamDesc("saturation")
 		.set_local_name(_("Saturation"))
 		);
-		ret.push_back(ParamDesc(ValueBase(),"hue")
+		ret.push_back(ParamDesc("hue")
 		.set_local_name(_("Hue"))
 		);
-		ret.push_back(ParamDesc(ValueBase(),"alpha")
+		ret.push_back(ParamDesc("alpha")
 		.set_local_name(_("Alpha"))
 		);
 		return ret;
@@ -264,11 +262,11 @@ ValueNode_RadialComposite::get_children_vocab_vfunc()const
 	else
 	if (type == type_vector)
 	{
-		ret.push_back(ParamDesc(ValueBase(),"radius")
+		ret.push_back(ParamDesc("radius")
 		.set_local_name(_("Radius"))
 		.set_description(_("The length of the vector"))
 		);
-		ret.push_back(ParamDesc(ValueBase(),"theta")
+		ret.push_back(ParamDesc("theta")
 		.set_local_name(_("Theta"))
 		.set_description(_("The angle of the vector with the X axis"))
 		);

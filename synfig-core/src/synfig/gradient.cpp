@@ -39,8 +39,6 @@
 #include <algorithm>
 #include <stdexcept>
 
-#include <ETL/misc>
-
 #include "general.h"
 #include <synfig/localization.h>
 #include <synfig/real.h>
@@ -107,7 +105,7 @@ Gradient::operator+(const Gradient &rhs) const
 		if (i == end())
 			current = pj = j++, left = right = pi;
 		else
-		if (j == end())
+		if (j == rhs.end())
 			current = pi = i++, left = right = pj;
 		else
 		if (i->pos < j->pos)
@@ -169,9 +167,12 @@ Gradient::operator+(const Gradient &rhs) const
 Gradient &
 Gradient::operator*=(const ColorReal &rhs)
 {
-	if (rhs == 0) cpoints.clear(); else
-		for (iterator iter = cpoints.begin(); iter!=cpoints.end(); iter++)
+	if (rhs == 0) {
+		cpoints.clear();
+	} else {
+		for (iterator iter = cpoints.begin(); iter!=cpoints.end(); ++iter)
 			(*iter).color *= rhs;
+	}
 	return *this;
 }
 
@@ -224,8 +225,7 @@ Gradient::proximity(const Real &x)
 	iterator iter;
 	Real dist(100000000);
 	Real prev_pos(-0230);
-	for(iter=begin();iter<end();iter++)
-	{
+	for (iter = begin(); iter < end(); ++iter) {
 		Real new_dist;
 
 		if(prev_pos==iter->pos)
@@ -235,21 +235,20 @@ Gradient::proximity(const Real &x)
 
 		if(new_dist>dist)
 		{
-			iter--;
+			--iter;
 			return iter;
 		}
 		dist=new_dist;
 		prev_pos=iter->pos;
 	}
-	iter--;
+	--iter;
 	return iter;
 }
 
 Gradient::iterator
 Gradient::find(const UniqueID &id)
 {
-	// TODO: return end() instead of exception
-	for(iterator i = begin(); i < end(); i++)
+	for (iterator i = begin(); i != end(); ++i)
 		if (id == *i) return i;
 	return end();
 }
@@ -307,19 +306,19 @@ CompiledGradient::set(const Gradient &gradient, bool repeat, bool zigzag) {
 	Gradient::CPointList cpoints;
 	cpoints.reserve(zigzag ? gradient.size()*2 : gradient.size());
 	for(Gradient::const_iterator i = gradient.begin(); i != gradient.end(); ++i) {
-		Real pos = std::max(0.0, std::min(1.0, i->pos));
+		Real pos = synfig::clamp(i->pos, 0., 1.);
 		cpoints.insert( std::upper_bound(cpoints.begin(), cpoints.end(), pos), *i )->pos = pos;
 	}
 
 	// add flipped points for zigzag
-	// memory for points already reserved enough, so all iterators will stay valid
 	if (zigzag) {
 		// add mirror in order:
 		//    0 1 2 3 4
 		//    0 1 2 3 4 - 4 3 2 1 0
-		for(Gradient::reverse_iterator ri = cpoints.rbegin(); ri != cpoints.rend(); ++ri) {
-			ri->pos *= 0.5;
-			cpoints.push_back(*ri);
+		for (int index = cpoints.size(); index > 0; --index) {
+			auto& elem = cpoints[index-1];
+			elem.pos *= 0.5;
+			cpoints.push_back(elem);
 			cpoints.back().pos = 1.0 - cpoints.back().pos;
 		}
 	}

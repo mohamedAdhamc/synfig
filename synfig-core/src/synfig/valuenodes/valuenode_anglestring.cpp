@@ -45,14 +45,13 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 
 /* === M A C R O S ========================================================= */
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_AngleString, RELEASE_VERSION_0_61_09, "anglestring", "Angle String")
+REGISTER_VALUENODE(ValueNode_AngleString, RELEASE_VERSION_0_61_09, "anglestring", N_("Angle String"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -61,8 +60,7 @@ REGISTER_VALUENODE(ValueNode_AngleString, RELEASE_VERSION_0_61_09, "anglestring"
 ValueNode_AngleString::ValueNode_AngleString(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	if (value.get_type() == type_string)
 	{
 		set_link("angle",ValueNode_Const::create(Angle::deg(0)));
@@ -83,7 +81,7 @@ ValueNode_AngleString::create_new()const
 }
 
 ValueNode_AngleString*
-ValueNode_AngleString::create(const ValueBase& x, etl::loose_handle<Canvas>)
+ValueNode_AngleString::create(const ValueBase& x, Canvas::LooseHandle)
 {
 	return new ValueNode_AngleString(x);
 }
@@ -96,8 +94,8 @@ ValueNode_AngleString::~ValueNode_AngleString()
 ValueBase
 ValueNode_AngleString::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	Real angle(Angle::deg((*angle_)(t).get(Angle())).get());
 	int width((*width_)(t).get(int()));
@@ -161,22 +159,22 @@ ValueNode_AngleString::get_children_vocab_vfunc()const
 {
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"angle")
+	ret.push_back(ParamDesc("angle")
 		.set_local_name(_("Angle"))
 		.set_description(_("Value to convert to string"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"width")
+	ret.push_back(ParamDesc("width")
 		.set_local_name(_("Width"))
 		.set_description(_("Width of the string"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"precision")
+	ret.push_back(ParamDesc("precision")
 		.set_local_name(_("Precision"))
 		.set_description(_("Number of decimal places"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"zero_pad")
+	ret.push_back(ParamDesc("zero_pad")
 		.set_local_name(_("Zero Padded"))
 		.set_description(_("When checked, the string is left filled with zeros to match the width"))
 	);

@@ -76,7 +76,6 @@ class DuckDrag_Combo : public DuckDrag_Base
 	synfig::Vector last_move;
 	synfig::Vector drag_offset;
 	synfig::Vector center;
-	synfig::Vector snap;
 
 	synfig::Angle original_angle;
 	synfig::Real original_mag;
@@ -204,7 +203,7 @@ public:
 /* === M E T H O D S ======================================================= */
 
 StateNormal::StateNormal():
-	Smach::state<StateNormal_Context>("normal")
+	Smach::state<StateNormal_Context>("normal", N_("Transform Tool"))
 {
 	insert(event_def(EVENT_STOP,&StateNormal_Context::event_stop_handler));
 	insert(event_def(EVENT_REFRESH,&StateNormal_Context::event_refresh_handler));
@@ -338,7 +337,7 @@ DuckDrag_Combo::DuckDrag_Combo():
 	bad_drag(),
 	move_only(),
 	is_moving(false),
-	canvas_view_(NULL),
+	canvas_view_(nullptr),
 	scale(false),
 	rotate(false),
 	constrain(false) // Lock aspect for scale
@@ -355,16 +354,12 @@ DuckDrag_Combo::begin_duck_drag(Duckmatic* duckmatic, const synfig::Vector& offs
 
 	bad_drag=false;
 
-		drag_offset=duckmatic->find_duck(offset)->get_trans_point();
-
-		//snap=drag_offset-duckmatic->snap_point_to_grid(drag_offset);
-		//snap=offset-drag_offset_;
-		snap=Vector(0,0);
+	drag_offset = duckmatic->find_duck(offset)->get_trans_point();
 
 	// Calculate center
 	Point vmin(100000000,100000000);
 	Point vmax(-100000000,-100000000);
-	//std::set<etl::handle<Duck> >::iterator iter;
+	//std::set<Duck::Handle>::iterator iter;
 	positions.clear();
 	int i;
 	for(i=0,iter=selected_ducks.begin();iter!=selected_ducks.end();++iter,i++)
@@ -406,9 +401,9 @@ DuckDrag_Combo::duck_drag(Duckmatic* duckmatic, const synfig::Vector& vector)
 
 	synfig::Vector vect;
 	if (move_only || (!scale && !rotate))
-		vect= duckmatic->snap_point_to_grid(vector)-drag_offset+snap;
+		vect = duckmatic->snap_point_to_grid(vector) - drag_offset;
 	else
-		vect= duckmatic->snap_point_to_grid(vector)-center+snap;
+		vect = duckmatic->snap_point_to_grid(vector) - center;
 
 	last_move=vect;
 
@@ -689,7 +684,7 @@ StateNormal_Context::event_key_down_handler(const Smach::event& x)
 {
 	// event.modifier yet not set when ctrl (or alt or shift)
 	// key pressed event handled. So we need to check this keys manually.
-	// We may encountred some cosmetic problems with mouse-cursor image
+	// We may encounter some cosmetic problems with mouse-cursor image
 	// if user will redefine modifier keys.
 	// Anyway processing of keys Ctrl+Right, Ctrl+Left etc will works fine.
 	// see 'xmodmap' command
@@ -718,7 +713,7 @@ StateNormal_Context::event_key_down_handler(const Smach::event& x)
 		set_shift_pressed(event.modifier&GDK_SHIFT_MASK);
 		break;
 	}
-	return Smach::RESULT_REJECT;
+	return Smach::RESULT_OK;
 }
 
 Smach::event_result
@@ -747,7 +742,7 @@ StateNormal_Context::event_key_up_handler(const Smach::event& x)
 	default:
 		break;
 	}
-	return Smach::RESULT_REJECT;
+	return Smach::RESULT_OK;
 }
 
 Smach::event_result

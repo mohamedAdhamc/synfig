@@ -13,7 +13,7 @@
 # glibmm (platform depended functions)
 # mlt++ imagemagick openexr libmng libpng libjpeg (various formats reading functions)
 # libxml++ libxml2 libxslt (.sif XML reading)
-# boost cairo fftw pango (image transformation and rendering functions)
+# cairo fftw pango (image transformation and rendering functions)
 # gtkmm3 (Synfig Studio GUI)
 # libsig++ (GUI signals and events)
 # sdl2 sdl2_mixer jack (audio output and synchronization)
@@ -62,7 +62,7 @@ fi
 # 2 - Install the required packages
 echo "Checking dependencies..."
 
-if ([ "$ID_LIKE" == "fedora" ] && [ VERSION_ID > 22 ]); then
+if ([ "$ID_LIKE" == "fedora" ] && [ "$VERSION_ID" > 22 ]); then
     PKG_LIST="git \
             intltool \
             libpng-devel \
@@ -83,7 +83,6 @@ if ([ "$ID_LIKE" == "fedora" ] && [ VERSION_ID > 22 ]); then
             automake \
             libtool \
             libtool-ltdl-devel \
-            boost-devel \
             shared-mime-info \
             OpenEXR-devel \
             libmng-devel \
@@ -108,7 +107,7 @@ if ([ "$ID_LIKE" == "fedora" ] && [ VERSION_ID > 22 ]); then
         sudo dnf install $PKG_LIST || true
     fi
 
-elif ([ "$ID_LIKE" == "fedora" ] && [ VERSION_ID <= 22]); then
+elif ( [ "$ID_LIKE" == "fedora" ] && [ "$VERSION_ID" <= 22 ] ) || ( [ "$ID_LIKE" == "rhel centos fedora" ] ); then
     PKG_LIST="git \
             intltool \
             libpng-devel \
@@ -129,7 +128,6 @@ elif ([ "$ID_LIKE" == "fedora" ] && [ VERSION_ID <= 22]); then
             automake \
             libtool \
             libtool-ltdl-devel \
-            boost-devel \
             shared-mime-info \
             OpenEXR-devel \
             libmng-devel \
@@ -150,7 +148,7 @@ elif ([ "$ID_LIKE" == "fedora" ] && [ VERSION_ID <= 22]); then
     fi
 
 elif [ "$ID_LIKE" == "suse opensuse" ]; then
-    PKG_LIST="git libpng-devel libjpeg-devel freetype-devel fontconfig-devel atk-devel pango-devel cairo-devel gtk3-devel gettext-devel libxml2-devel libxml++-devel gcc-c++ autoconf automake libtool libtool-ltdl-devel boost-devel shared-mime-info"
+    PKG_LIST="git libpng-devel libjpeg-devel freetype-devel fontconfig-devel atk-devel pango-devel cairo-devel gtk3-devel gettext-devel libxml2-devel libxml++-devel gcc-c++ autoconf automake libtool libtool-ltdl-devel shared-mime-info"
     PKG_LIST="${PKG_LIST} OpenEXR-devel libmng-devel ImageMagick-c++-devel gtkmm3-devel glibmm2-devel"
 
     if ! ( rpm -qv $PKG_LIST ); then
@@ -167,7 +165,6 @@ elif [ "$ID_LIKE" == "suse opensuse" ]; then
 elif [ "$ID_LIKE" == "arch" ]; then
     PKG_LIST="git \
             automake autoconf \
-            boost \
             cairo \
             freetype2 \
             fftw \
@@ -195,9 +192,52 @@ elif [ "$ID_LIKE" == "arch" ]; then
     echo "Running pacman (root privileges are needed)..."
     echo
     sudo pacman -S --needed --noconfirm $PKG_LIST || true
-
+elif [ -f /etc/altlinux-release ]; then
+            #  ALT Linux case
+            PKG_LIST=" \
+                gcc-c++ \
+                git-core \
+                shared-mime-info \
+                intltool \
+                gettext \
+                libjpeg-devel \
+                fontconfig \
+                libfreetype-devel \
+                libfribidi-devel \
+                fontconfig-devel \
+                libxml2-devel \
+                libtiff-devel \
+                libjasper-devel \
+                libdirectfb-devel \
+                libfftw3-devel \
+                libXfixes-devel \
+                libXinerama-devel \
+                libXdamage-devel \
+                libXcomposite-devel \
+                libXcursor-devel \
+                libXft-devel \
+                libXrender-devel \
+                libXt-devel \
+                libXrandr-devel \
+                libXi-devel \
+                libXext-devel \
+                libX11-devel \
+                libatk-devel \
+                libpng-devel \
+                bzip2 \
+                libjack-devel \
+                libmng-devel \
+                libgtkmm3-devel \
+                libglibmm-devel \
+                libsigc++2-devel \
+                libxml++2-devel \
+                libImageMagick-devel \
+                libmlt++-devel \
+                libxslt-devel python-devel python-module-lxml"
+    echo "Running apt-get (root privileges required)..."
+    echo
+    su -c "( apt-get update || true ) && apt-get install -y -q $PKG_LIST"
 elif [ "$ID_LIKE" == "debian" ] || [ "$ID_LIKE" == "ubuntu" ] || [ "$ID_LIKE" == "ubuntu debian" ]; then
-    if [ ! -f /etc/altlinux-release ]; then
             #  Debian / Ubuntu
             PKG_LIST=" \
                 build-essential \
@@ -216,8 +256,6 @@ elif [ "$ID_LIKE" == "debian" ] || [ "$ID_LIKE" == "ubuntu" ] || [ "$ID_LIKE" ==
                 libxml2-dev \
                 libtiff5-dev \
                 libmlt-dev libmlt++-dev libmlt-data \
-                x11proto-xext-dev libdirectfb-dev libxfixes-dev libxinerama-dev libxdamage-dev libxcomposite-dev libxcursor-dev libxft-dev libxrender-dev libxt-dev libxrandr-dev libxi-dev libxext-dev libx11-dev \
-                libatk1.0-dev \
                 libgl1-mesa-dev \
                 imagemagick \
                 libsdl2-dev \
@@ -230,50 +268,8 @@ elif [ "$ID_LIKE" == "debian" ] || [ "$ID_LIKE" == "ubuntu" ] || [ "$ID_LIKE" ==
                 libglibmm-2.4-dev \
                 libsigc++-2.0-dev \
                 libxml++2.6-dev \
-                libboost-system-dev \
                 libmagick++-dev \
-                libxslt-dev python-dev python3-lxml"
-        else
-            #  ALT Linux case
-            PKG_LIST=" \
-                rpm-build \
-                git-core \
-                shared-mime-info \
-                libltdl3-devel \
-                intltool \
-                gettext \
-                libpng12-devel \
-                libjpeg-devel \
-                fontconfig \
-                libfreetype-devel \
-                libfribidi-devel \
-                fontconfig-devel \
-                libxml2-devel \
-                libtiff-devel \
-                libjasper-devel \
-                libdirectfb-devel \
-                libfftw3-dev \
-                libXfixes-devel \
-                libXinerama-devel \
-                libXdamage-devel \
-                libXcomposite-devel \
-                libXcursor-devel \
-                libXft-devel \
-                libXrender-devel \
-                libXt-devel \
-                libXrandr-devel \
-                libXi-devel \
-                libXext-devel \
-                libX11-devel \
-                libatk-devel \
-                bzip2 \
-                libmng-devel \
-                libgtkmm3-devel \
-                libglibmm-devel \
-                libsigc++2-devel \
-                libxml++2-devel \
-                libxslt-devel python-devel python3-lxml"
-        fi
+                libxslt-dev python3 python3-lxml"
 
     echo "Running apt-get (root privileges are needed)..."
     echo

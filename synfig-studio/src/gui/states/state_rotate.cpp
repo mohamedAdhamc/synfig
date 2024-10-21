@@ -43,6 +43,7 @@
 #include <gui/duck.h>
 #include <gui/localization.h>
 #include <gui/workarea.h>
+#include <gui/event_keyboard.h>
 
 #include <synfig/angle.h>
 #include <synfig/general.h>
@@ -88,10 +89,11 @@ class DuckDrag_Rotate : public DuckDrag_Base
 	bool move_only;
 
 public:
-	etl::handle<CanvasView> canvas_view_;
+	CanvasView::Handle canvas_view_;
 	bool use_magnitude;
+	bool constrain;
 	DuckDrag_Rotate();
-	void begin_duck_drag(Duckmatic* duckmatic, const synfig::Vector& begin);
+	void begin_duck_drag(Duckmatic* duckmatic, const synfig::Vector& offset);
 	bool end_duck_drag(Duckmatic* duckmatic);
 	void duck_drag(Duckmatic* duckmatic, const synfig::Vector& vector);
 
@@ -101,7 +103,7 @@ public:
 
 class studio::StateRotate_Context : public sigc::trackable
 {
-	etl::handle<CanvasView> canvas_view_;
+	CanvasView::Handle canvas_view_;
 	CanvasView::IsWorking is_working;
 
 	synfigapp::Settings& settings;
@@ -115,6 +117,15 @@ class studio::StateRotate_Context : public sigc::trackable
 	Gtk::CheckButton scale_checkbutton;
 	Gtk::Box scale_box;
 
+	Gtk::Label constrain_label;
+
+	bool shift_pressed;
+
+	void set_shift_pressed(bool value);
+
+	void set_constrain_flag(bool x) { if(duck_dragger_ && x!=duck_dragger_->constrain)
+										  {duck_dragger_->constrain=x;} }
+
 public:
 
 	bool get_scale_flag()const { return scale_checkbutton.get_active(); }
@@ -122,6 +133,8 @@ public:
 
 	Smach::event_result event_stop_handler(const Smach::event& x);
 	Smach::event_result event_refresh_tool_options(const Smach::event& x);
+	Smach::event_result event_key_down_handler(const Smach::event& x);
+	Smach::event_result event_key_up_handler(const Smach::event& x);
 
 	void refresh_tool_options();
 
@@ -131,7 +144,7 @@ public:
 
 	~StateRotate_Context();
 
-	const etl::handle<CanvasView>& get_canvas_view()const{return canvas_view_;}
+	const CanvasView::Handle& get_canvas_view()const{return canvas_view_;}
 	etl::handle<synfigapp::CanvasInterface> get_canvas_interface()const{return canvas_view_->canvas_interface();}
 	synfig::Canvas::Handle get_canvas()const{return canvas_view_->get_canvas();}
 	WorkArea * get_work_area()const{return canvas_view_->get_work_area();}
@@ -143,10 +156,13 @@ public:
 /* === M E T H O D S ======================================================= */
 
 StateRotate::StateRotate():
-	Smach::state<StateRotate_Context>("rotate")
+	Smach::state<StateRotate_Context>("rotate", N_("Rotate Tool"))
 {
 	insert(event_def(EVENT_REFRESH_TOOL_OPTIONS,&StateRotate_Context::event_refresh_tool_options));
 	insert(event_def(EVENT_STOP,&StateRotate_Context::event_stop_handler));
+	insert(event_def(EVENT_WORKAREA_KEY_DOWN,&StateRotate_Context::event_key_down_handler));
+	insert(event_def(EVENT_WORKAREA_KEY_UP,&StateRotate_Context::event_key_up_handler));
+
 }
 
 StateRotate::~StateRotate()
@@ -188,7 +204,8 @@ StateRotate_Context::StateRotate_Context(CanvasView* canvas_view):
 	canvas_view_(canvas_view),
 	is_working(*canvas_view),
 	settings(synfigapp::Main::get_selected_input_device()->settings()),
-	duck_dragger_(new DuckDrag_Rotate())
+	duck_dragger_(new DuckDrag_Rotate()),
+	shift_pressed()
 {
 	duck_dragger_->canvas_view_=get_canvas_view();
 
@@ -209,11 +226,17 @@ StateRotate_Context::StateRotate_Context(CanvasView* canvas_view):
 	scale_box.pack_start(scale_label, true, true, 0);
 	scale_box.pack_start(scale_checkbutton, false, false, 0);
 
+	constrain_label.set_label(_("Shift to constrain"));
+	constrain_label.set_halign(Gtk::ALIGN_START);
+	constrain_label.set_valign(Gtk::ALIGN_CENTER);
+
 	// Toolbox layout
 	options_grid.attach(title_label,
 		0, 0, 2, 1);
 	options_grid.attach(scale_box,
 		0, 1, 2, 1);
+	options_grid.attach(constrain_label,
+		0, 2, 2, 1);
 
 	scale_checkbutton.signal_toggled().connect(sigc::mem_fun(*this,&StateRotate_Context::refresh_scale_flag));
 
@@ -254,6 +277,49 @@ StateRotate_Context::event_refresh_tool_options(const Smach::event& /*x*/)
 }
 
 Smach::event_result
+StateRotate_Context::event_key_down_handler(const Smach::event &x)
+{
+	const EventKeyboard& event(*reinterpret_cast<const EventKeyboard*>(&x));
+	switch(event.keyval)
+	{
+	case GDK_KEY_Shift_L:
+	case GDK_KEY_Shift_R:
+		set_shift_pressed(true);
+		break;
+	default:
+		set_shift_pressed(event.modifier&GDK_SHIFT_MASK);
+		break;
+	}
+	return Smach::RESULT_OK;
+
+}
+
+Smach::event_result
+StateRotate_Context::event_key_up_handler(const Smach::event &x)
+{
+	const EventKeyboard& event(*reinterpret_cast<const EventKeyboard*>(&x));
+	switch(event.keyval)
+	{
+	case GDK_KEY_Shift_L:
+	case GDK_KEY_Shift_R:
+		set_shift_pressed(false);
+		break;
+	default:
+		break;
+	}
+	return Smach::RESULT_OK;
+
+}
+
+void StateRotate_Context::set_shift_pressed(bool value)
+{
+	if (shift_pressed == value)
+		return;
+	shift_pressed = value;
+	set_constrain_flag(shift_pressed);
+}
+
+Smach::event_result
 StateRotate_Context::event_stop_handler(const Smach::event& /*x*/)
 {
 	canvas_view_->stop();
@@ -282,7 +348,8 @@ DuckDrag_Rotate::DuckDrag_Rotate():
 	original_mag(),
 	bad_drag(),
 	move_only(),
-	use_magnitude(true)
+	use_magnitude(true),
+	constrain()
 { }
 
 void
@@ -311,7 +378,7 @@ DuckDrag_Rotate::begin_duck_drag(Duckmatic* duckmatic, const synfig::Vector& off
 	// Calculate center
 	Point vmin(100000000,100000000);
 	Point vmax(-100000000,-100000000);
-	//std::set<etl::handle<Duck> >::iterator iter;
+	//std::set<Duck::Handle>::iterator iter;
 	positions.clear();
 	int i;
 	for(i=0,iter=selected_ducks.begin();iter!=selected_ducks.end();++iter,i++)
@@ -342,7 +409,9 @@ DuckDrag_Rotate::duck_drag(Duckmatic* duckmatic, const synfig::Vector& vector)
 	if(bad_drag)
 		return;
 
-	//std::set<etl::handle<Duck> >::iterator iter;
+	//std::set<Duck::Handle>::iterator iter;
+	duckmatic->set_axis_lock(false);
+
 	synfig::Vector vect(duckmatic->snap_point_to_grid(vector)-center+snap);
 
 	const DuckList selected_ducks(duckmatic->get_selected_ducks());
@@ -376,6 +445,14 @@ DuckDrag_Rotate::duck_drag(Duckmatic* duckmatic, const synfig::Vector& vector)
 
 	Angle::tan angle(vect[1],vect[0]);
 	angle=original_angle-angle;
+
+	if (constrain){
+		Angle::deg angleDeg(static_cast<Angle>(angle));
+		float degrees = angleDeg.get()/15;
+		angleDeg= Angle::deg(degrees>0?std::floor(degrees)*15:std::ceil(degrees)*15);
+		angle = Angle::tan(static_cast<Angle>(angleDeg));
+	}
+
 	Real mag(vect.mag()/original_mag);
 	Real sine(Angle::sin(angle).get());
 	Real cosine(Angle::cos(angle).get());

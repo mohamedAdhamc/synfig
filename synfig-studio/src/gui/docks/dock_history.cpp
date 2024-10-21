@@ -50,7 +50,6 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 using namespace studio;
 
@@ -74,9 +73,9 @@ Dock_History::Dock_History():
 	App::signal_instance_deleted().connect(sigc::mem_fun(*this,&studio::Dock_History::delete_instance));
 	App::signal_instance_selected().connect(sigc::mem_fun(*this,&studio::Dock_History::set_selected_instance_signal));
 
-	action_group->add(Gtk::Action::create(
+	action_group->add(Gtk::Action::create_with_icon_name(
 		"clear-undo",
-		Gtk::StockID("synfig-clear_undo"),
+		"clear_undo_icon",
 		_("Clear Undo Stack"),
 		_("Clear the undo stack")
 	),
@@ -85,9 +84,9 @@ Dock_History::Dock_History():
 			&Dock_History::clear_undo
 		)
 	);
-	action_group->add(Gtk::Action::create(
+	action_group->add(Gtk::Action::create_with_icon_name(
 		"clear-redo",
-		Gtk::StockID("synfig-clear_redo"),
+		"clear_redo_icon",
 		_("Clear Redo Stack"),
 		_("Clear the redo stack")
 	),
@@ -96,9 +95,9 @@ Dock_History::Dock_History():
 			&Dock_History::clear_redo
 		)
 	);
-	action_group->add(Gtk::Action::create(
+	action_group->add(Gtk::Action::create_with_icon_name(
 		"clear-undo-and-redo",
-		Gtk::Stock::CLEAR,
+		"edit-clear",
 		_("Clear Undo and Redo Stacks"),
 		_("Clear the undo and redo stacks")
 	),
@@ -107,17 +106,17 @@ Dock_History::Dock_History():
 			&Dock_History::clear_undo_and_redo
 		)
 	);
-	action_group->add(Gtk::Action::create(
+	action_group->add(Gtk::Action::create_with_icon_name(
 		"undo",
-		Gtk::StockID("synfig-undo"),
+		"action_doc_undo_icon",
 		_("Undo"),
 		_("Undo the previous action")
 	),
 		sigc::ptr_fun(studio::App::undo)
 	);
-	action_group->add(Gtk::Action::create(
+	action_group->add(Gtk::Action::create_with_icon_name(
 		"redo",
-		Gtk::StockID("synfig-redo"),
+		"action_doc_redo_icon",
 		_("Redo"),
 		_("Redo the previously undone action")
 	),
@@ -464,7 +463,7 @@ Dock_History::on_action_toggle(const Glib::ustring& path_string)
 
 	const Gtk::TreeRow row = *(selected_instance->history_tree_store()->get_iter(path));
 
-	handle<synfigapp::Action::Undoable> action=row[history_tree_model.action];
+	etl::handle<synfigapp::Action::Undoable> action = row[history_tree_model.action];
 
-	selected_instance->synfigapp::Instance::set_action_status(action,!action->is_active());
+	selected_instance->set_action_status(action, !action->is_active());
 }

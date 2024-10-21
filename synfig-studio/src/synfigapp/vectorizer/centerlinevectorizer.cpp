@@ -75,11 +75,11 @@ inline void deleteSkeletonList(SkeletonList *skeleton) {
 
 // takes two arguments ( image layer handle, config )
 
-std::vector< etl::handle<synfig::Layer> > 
-VectorizerCore::centerlineVectorize(etl::handle<synfig::Layer_Bitmap> &image,const etl::handle<synfigapp::UIInterface> &ui_interface, 
-const CenterlineConfiguration &configuration,const Gamma &gamma)
+std::vector<synfig::Layer::Handle>
+VectorizerCore::centerlineVectorize(synfig::Layer_Bitmap::Handle& image, const etl::handle<synfigapp::UIInterface>& ui_interface,
+const CenterlineConfiguration& configuration, const Gamma& gamma)
  {
-  synfig::debug::Log::info("","Inside CenterlineVectorize");
+  synfig::debug::Log::info({},"Inside CenterlineVectorize");
   VectorizerCoreGlobals globals;
   globals.currConfig = &configuration;
 
@@ -109,7 +109,7 @@ const CenterlineConfiguration &configuration,const Gamma &gamma)
   ui_interface->amount_complete(8,10);
 
 
-  std::vector< etl::handle<synfig::Layer> > sortibleResult;
+  std::vector<synfig::Layer::Handle> sortibleResult;
   
   // step 5
   // Take samples of image colors to associate each sequence to its corresponding
@@ -125,10 +125,10 @@ const CenterlineConfiguration &configuration,const Gamma &gamma)
   return sortibleResult;
 }
 
-std::vector< etl::handle<synfig::Layer> > 
-VectorizerCore::vectorize(const etl::handle<synfig::Layer_Bitmap> &img,const etl::handle<synfigapp::UIInterface> &ui_interface, const VectorizerConfiguration &c, const Gamma &gamma) 
+std::vector<synfig::Layer::Handle> 
+VectorizerCore::vectorize(const synfig::Layer_Bitmap::Handle& img, const etl::handle<synfigapp::UIInterface>& ui_interface, const VectorizerConfiguration& c, const Gamma& gamma)
 {
-  std::vector< etl::handle<synfig::Layer> > result;
+  std::vector<synfig::Layer::Handle> result;
 
   if (c.m_outline)
   {
@@ -136,7 +136,7 @@ VectorizerCore::vectorize(const etl::handle<synfig::Layer_Bitmap> &img,const etl
   }
   else 
   {
-    Handle img2(img);
+	synfig::Layer_Bitmap::Handle img2(img);
     result = centerlineVectorize(img2, ui_interface,static_cast<const CenterlineConfiguration &>(c), gamma);
     ui_interface->amount_complete(10,10);
 

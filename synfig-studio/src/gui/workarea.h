@@ -52,6 +52,9 @@
 #include <synfig/time.h>
 #include <synfig/vector.h>
 
+#include "dialogs/dialog_guide.h"
+
+
 /* === M A C R O S ========================================================= */
 
 /* === T Y P E D E F S ===================================================== */
@@ -69,6 +72,7 @@ class CanvasView;
 class WorkAreaRenderer;
 class Renderer_Canvas;
 class LockDucks;
+class Dialog_Guide;
 
 
 class WorkArea : public Gtk::Grid, public Duckmatic
@@ -120,20 +124,24 @@ public:
 	friend class WorkAreaRenderer;
 	friend class WorkAreaProgress;
 
+
 private:
 	/*
  -- ** -- P R I V A T E   D A T A ---------------------------------------------
 	*/
 
+	Dialog_Guide guide_dialog;
+
 	std::set<etl::handle<WorkAreaRenderer> > renderer_set_;
 
 	etl::loose_handle<synfigapp::CanvasInterface> canvas_interface;
-	etl::handle<synfig::Canvas> canvas;
+	synfig::Canvas::Handle canvas;
 	etl::loose_handle<studio::Instance> instance;
 	etl::loose_handle<studio::CanvasView> canvas_view;
 	etl::handle<Renderer_Canvas> renderer_canvas;
 
 	// Widgets
+	Gtk::Button* menubutton_box;
 	Gtk::DrawingArea *drawing_area;
 	Gtk::Frame *drawing_frame;
 	Widget_Ruler *hruler;
@@ -177,9 +185,11 @@ private:
 	synfig::Point previous_focus;
 
 	//! Active Bone
-	etl::loose_handle<synfig::ValueNode> active_bone_;
+	synfig::ValueNode::LooseHandle active_bone_;
 	bool highlight_active_bone;
 
+	//! This state is true if ruler should be shown
+	bool show_rulers;
 	//! This flag is set if the grid should be drawn
 	bool show_grid;
 
@@ -219,14 +229,17 @@ private:
 	// render future and past frames in background
 	bool background_rendering;
 
-	etl::loose_handle<synfig::ValueNode> selected_value_node_;
+	synfig::ValueNode::LooseHandle selected_value_node_;
 
 	bool allow_duck_clicks;
 	bool allow_bezier_clicks;
 	bool allow_layer_clicks;
-	bool curr_guide_is_x;
 
 	etl::handle<LockDucks> lock_ducks;
+
+	bool rotate_guide = false;
+	bool from_ruler_event = false;
+	bool guide_highlighted = false;
 
 public:
 	/*
@@ -258,7 +271,7 @@ private:
 	sigc::signal<void, GdkDevice*> signal_input_device_changed_;
 	sigc::signal<void> signal_popup_menu_;
 	sigc::signal<void, synfig::Point> signal_user_click_[5]; //!< One signal per button
-	sigc::signal<void, etl::handle<synfig::Layer> > signal_layer_selected_; //!< Signal for when the user clicks on a layer
+	sigc::signal<void, synfig::Layer::Handle> signal_layer_selected_; //!< Signal for when the user clicks on a layer
 
 public:
 	sigc::signal<void>& signal_rendering() { return signal_rendering_; }
@@ -269,7 +282,7 @@ public:
 	sigc::signal<void, GdkDevice*>& signal_input_device_changed() { return signal_input_device_changed_; }
 	sigc::signal<void> &signal_popup_menu() { return signal_popup_menu_; }
 	sigc::signal<void, synfig::Point> &signal_user_click(int button=0){ return signal_user_click_[button]; } //!< One signal per button (5 buttons)
-	sigc::signal<void, etl::handle<synfig::Layer> >& signal_layer_selected() { return signal_layer_selected_; }
+	sigc::signal<void, synfig::Layer::Handle>& signal_layer_selected() { return signal_layer_selected_; }
 
 private:
 	/*
@@ -277,8 +290,8 @@ private:
 	*/
 
 	void set_drag_mode(DragMode mode);
-
-	void set_active_bone_value_node(etl::loose_handle<synfig::ValueNode> x);
+	void cancel_drag_on_mBtn_press();
+	void set_active_bone_value_node(synfig::ValueNode::LooseHandle x);
 
 public:
 	/*
@@ -290,7 +303,7 @@ public:
 
 	void view_window_changed() { signal_view_window_changed()(); }
 
-	const etl::loose_handle<synfig::ValueNode>& get_selected_value_node() { return  selected_value_node_; }
+	const synfig::ValueNode::LooseHandle& get_selected_value_node() { return  selected_value_node_; }
 	const synfig::Point& get_drag_point()const { return drag_point; }
 
 	synfig::VectorInt get_windows_offset() const;
@@ -320,9 +333,9 @@ public:
 	void set_background_rendering(bool x);
 	bool get_background_rendering() const { return background_rendering; }
 
-	void set_selected_value_node(etl::loose_handle<synfig::ValueNode> x);
+	void set_selected_value_node(synfig::ValueNode::LooseHandle x);
 
-	const etl::loose_handle<synfig::ValueNode>& get_active_bone_value_node(){return active_bone_;}
+	const synfig::ValueNode::LooseHandle& get_active_bone_value_node(){return active_bone_;}
 	bool get_active_bone_display(){return highlight_active_bone;}
 	void set_active_bone_display(bool x){highlight_active_bone=x;}
 
@@ -341,9 +354,9 @@ public:
 	Glib::RefPtr<const Gtk::Adjustment> get_scrolly_adjustment() const { return scrolly_adjustment; }
 
 	void set_instance(etl::loose_handle<studio::Instance> x) { instance=x; }
-	void set_canvas(etl::handle<synfig::Canvas> x) { canvas=x; }
+	void set_canvas(synfig::Canvas::Handle x) { canvas=x; }
 	void set_canvas_view(etl::loose_handle<studio::CanvasView> x) { canvas_view=x; }
-	const etl::handle<synfig::Canvas>& get_canvas() const { return canvas; }
+	const synfig::Canvas::Handle& get_canvas() const { return canvas; }
 	const etl::loose_handle<studio::Instance>& get_instance() const { return instance; }
 	const etl::loose_handle<studio::CanvasView>& get_canvas_view() const { return canvas_view; }
 	const etl::handle<Renderer_Canvas>& get_renderer_canvas() const { return renderer_canvas; }
@@ -351,6 +364,8 @@ public:
 	void refresh_dimension_info();
 
 	void show_ruler();
+	void set_show_rulers(bool visible)
+  
 	//! Enables showing of the grid
 	void enable_grid();
 	//! Disables showing of the grid
@@ -368,6 +383,7 @@ public:
 	//! Returns the color of the grid
 	const synfig::Color &get_grid_color()const { return Duckmatic::get_grid_color();}
 
+	bool get_show_rulers()const { return show_rulers; }
 	//! Returns the state of the show_guides flag
 	bool get_show_guides()const { return show_guides; }
 	//! Sets the showing of the grid
@@ -463,6 +479,8 @@ public:
 
 	void grab_focus();
 
+	Gtk::DrawingArea* get_drawing_area() { return drawing_area; }
+
 private:
 	/*
  -- ** -- S I G N A L   T E R M I N A L S -------------------------------------
@@ -473,7 +491,7 @@ private:
 	bool on_drawing_area_event(GdkEvent* event);
 	bool on_hruler_event(GdkEvent* event);
 	bool on_vruler_event(GdkEvent* event);
-	void on_duck_selection_single(const etl::handle<Duck>& duck_guid);
+	void on_duck_selection_single(const Duck::Handle& duck_guid);
 }; // END of class WorkArea
 
 

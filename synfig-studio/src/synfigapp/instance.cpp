@@ -72,7 +72,6 @@
 #include <synfig/target_scanline.h>
 #include "actions/valuedescexport.h"
 #include "actions/layerparamset.h"
-#include "actions/layerembed.h"
 #include <map>
 
 #include <synfigapp/localization.h>
@@ -83,7 +82,6 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 using namespace synfigapp;
 
@@ -91,7 +89,7 @@ using namespace synfigapp;
 
 /* === G L O B A L S ======================================================= */
 
-static std::map<loose_handle<Canvas>, loose_handle<Instance> > instance_map_;
+static std::map<Canvas::LooseHandle, etl::loose_handle<Instance>> instance_map_;
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -122,7 +120,7 @@ synfigapp::is_editable(synfig::ValueNode::Handle value_node)
 }
 
 etl::handle<Instance>
-synfigapp::find_instance(etl::handle<synfig::Canvas> canvas)
+synfigapp::find_instance(Canvas::Handle canvas)
 {
 	if(instance_map_.count(canvas)==0)
 		return 0;
@@ -131,7 +129,7 @@ synfigapp::find_instance(etl::handle<synfig::Canvas> canvas)
 
 /* === M E T H O D S ======================================================= */
 
-Instance::Instance(etl::handle<synfig::Canvas> canvas, synfig::FileSystem::Handle container):
+Instance::Instance(Canvas::Handle canvas, synfig::FileSystem::Handle container):
 	canvas_(canvas),
 	container_(container)
 {
@@ -142,14 +140,12 @@ Instance::Instance(etl::handle<synfig::Canvas> canvas, synfig::FileSystem::Handl
 	instance_map_[canvas]=this;
 } // END of synfigapp::Instance::Instance()
 
-handle<Instance>
-Instance::create(etl::handle<synfig::Canvas> canvas, synfig::FileSystem::Handle container)
+etl::handle<Instance>
+Instance::create(Canvas::Handle canvas, synfig::FileSystem::Handle container)
 {
 	// Construct a new instance
-	handle<Instance> instance(new Instance(canvas, container));
-
-	return instance;
-} // END of synfigapp::Instance::create()
+	return new Instance(canvas, container);
+}
 
 synfig::String
 Instance::get_file_name()const
@@ -167,11 +163,11 @@ Instance::~Instance()
 {
 	instance_map_.erase(canvas_);
 
-	if (getenv("SYNFIG_DEBUG_DESTRUCTORS"))
-		synfig::info("Instance::~Instance(): Deleted");
+	DEBUG_LOG("SYNFIG_DEBUG_DESTRUCTORS",
+		"Instance::~Instance(): Deleted");
 }
 
-handle<CanvasInterface>
+etl::handle<CanvasInterface>
 Instance::find_canvas_interface(synfig::Canvas::Handle canvas)
 {
 	if(!canvas)
@@ -179,9 +175,7 @@ Instance::find_canvas_interface(synfig::Canvas::Handle canvas)
 	while(canvas->is_inline())
 		canvas=canvas->parent();
 
-	CanvasInterfaceList::iterator iter;
-
-	for(iter=canvas_interface_list().begin();iter!=canvas_interface_list().end();iter++)
+	for (CanvasInterfaceList::iterator iter = canvas_interface_list().begin(); iter != canvas_interface_list().end(); ++iter)
 		if((*iter)->get_canvas()==canvas)
 			return *iter;
 
@@ -195,7 +189,7 @@ Instance::import_external_canvas(Canvas::Handle canvas, std::map<Canvas*, Canvas
 
 	for(IndependentContext i = canvas->get_independent_context(); *i; i++)
 	{
-		etl::handle<Layer_PasteCanvas> paste_canvas = etl::handle<Layer_PasteCanvas>::cast_dynamic(*i);
+		Layer_PasteCanvas::Handle paste_canvas = Layer_PasteCanvas::Handle::cast_dynamic(*i);
 		if (!paste_canvas) continue;
 
 		Canvas::Handle sub_canvas = paste_canvas->get_sub_canvas();
@@ -226,13 +220,13 @@ Instance::import_external_canvas(Canvas::Handle canvas, std::map<Canvas*, Canvas
 				continue;
 			}
 		} else {
-			imported[sub_canvas.get()] = NULL;
+			imported[sub_canvas.get()] = nullptr;
 
 			// generate name
-			std::string fname = filename_sans_extension(basename(sub_canvas->get_file_name()));
+			std::string fname = filesystem::Path::filename_sans_extension(filesystem::Path::basename(sub_canvas->get_file_name()));
 			static const char bad_chars[]=" :#@$^&()*";
-			for(std::string::iterator j = fname.begin(); j != fname.end(); j++)
-				for(const char *k = bad_chars; *k != 0; k++)
+			for(std::string::iterator j = fname.begin(); j != fname.end(); ++j)
+				for (const char* k = bad_chars; *k != 0; ++k)
 					if (*j == *k) { *j = '_'; break; }
 			if (fname.empty()) fname = "canvas";
 			if (fname[0]>='0' && fname[0]<='9')
@@ -246,7 +240,7 @@ Instance::import_external_canvas(Canvas::Handle canvas, std::map<Canvas*, Canvas
 				if (canvas->value_node_list().count(name) == false)
 				{
 					found = true;
-					for(std::list<Canvas::Handle>::const_iterator iter=canvas->children().begin();iter!=canvas->children().end();iter++)
+					for (std::list<Canvas::Handle>::const_iterator iter = canvas->children().begin(); iter != canvas->children().end(); ++iter)
 						if(name==(*iter)->get_id())
 							{ found = false; break; }
 					if (found) break;
@@ -278,7 +272,7 @@ Instance::import_external_canvas(Canvas::Handle canvas, std::map<Canvas*, Canvas
 		}
 	}
 
-	for(std::list<Canvas::Handle>::const_iterator i = canvas->children().begin(); i != canvas->children().end(); i++)
+	for (std::list<Canvas::Handle>::const_iterator i = canvas->children().begin(); i != canvas->children().end(); ++i)
 		if (import_external_canvas(*i, imported))
 			return true;
 
@@ -306,15 +300,15 @@ bool Instance::save_surface(const synfig::Surface &surface, const synfig::String
 	if (surface.get_h() <= 0 || surface.get_w() <= 0)
 		return false;
 
-	String ext = filename_extension(filename);
+	String ext = filesystem::Path::filename_extension(filename);
 	if (ext.empty())
 		return false;
 
 	ext.erase(0, 1);
-	String tmpfile = FileSystemTemporary::generate_system_temporary_filename("surface");
+	filesystem::Path tmpfile = FileSystemTemporary::generate_system_temporary_filename("surface");
 
-	etl::handle<Target_Scanline> target =
-		etl::handle<Target_Scanline>::cast_dynamic(
+	Target_Scanline::Handle target =
+		Target_Scanline::Handle::cast_dynamic(
 			Target::create(Target::ext_book()[ext],tmpfile,TargetParam()) );
 	if (!target)
 		return false;
@@ -334,11 +328,11 @@ bool Instance::save_surface(const synfig::Surface &surface, const synfig::String
 	target = nullptr;
 
 	if (success)
-		success = get_canvas()->get_file_system()->directory_create(etl::dirname(filename));
+		success = get_canvas()->get_file_system()->directory_create(filesystem::Path::dirname(filename));
 	if (success)
-		success = FileSystem::copy(FileSystemNative::instance(), tmpfile, get_canvas()->get_file_system(), filename);
+		success = FileSystem::copy(FileSystemNative::instance(), tmpfile.u8string(), get_canvas()->get_file_system(), filename);
 
-	FileSystemNative::instance()->file_remove(tmpfile);
+	FileSystemNative::instance()->file_remove(tmpfile.u8string());
 
 	return success;
 }
@@ -502,7 +496,7 @@ Instance::process_filenames(const ProcessFilenamesParams &params, const synfig::
 		  && linkable->get_parent_canvas()->get_root() != params.canvas)
 			return;
 
-		const ParamVocab vocab = linkable->get_children_vocab();
+		const ParamVocab& vocab = linkable->get_children_vocab();
 		for(ParamVocab::const_iterator i = vocab.begin(); i != vocab.end(); ++i)
 			process_filenames(params, ValueNode::Handle(linkable->get_link(i->get_name())), i->get_hint() == "filename");
 
@@ -657,7 +651,7 @@ Instance::save_as(const synfig::String &file_name)
 
 		// remove previous canvas file
 		if (previous_canvas_identifier.filename != new_canvas_identifier.filename)
-			new_canvas_filesystem->file_remove(previous_canvas_identifier.filename);
+			new_canvas_filesystem->file_remove(previous_canvas_identifier.filename.u8string());
 
 		// set new canvas filename
 		canvas->set_file_name(new_canvas_filename);
@@ -731,7 +725,7 @@ Instance::generate_new_name(
 	if (layer->get_param_list().count("filename")) {
 		ValueBase value = layer->get_param("filename");
 		if (value.same_type_as(String()))
-			filename = basename(value.get(String()));
+			filename = filesystem::Path::basename(value.get(String()));
 	}
 
 	if (filename.empty())
@@ -744,7 +738,7 @@ Instance::generate_new_name(
 	assert(get_canvas()->get_file_system());
 	String short_filename = CanvasFileNaming::generate_container_filename(get_canvas()->get_file_system(), filename);
 	String full_filename = CanvasFileNaming::make_full_filename(get_canvas()->get_file_name(), short_filename);
-	String base = etl::filename_sans_extension(CanvasFileNaming::filename_base(short_filename));
+	String base = filesystem::Path::filename_sans_extension(CanvasFileNaming::filename_base(short_filename));
 
 	out_description = base;
 	out_filename = full_filename;

@@ -36,18 +36,16 @@
 
 #include <gui/trees/layergrouptree.h>
 
-#include <ETL/misc>
-
 #include <gui/exception_guard.h>
 #include <gui/localization.h>
 
 #include <synfig/layer.h>
+#include <synfig/misc.h>
 
 #endif
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 using namespace studio;
 
@@ -75,9 +73,10 @@ LayerGroupTree::LayerGroupTree()
 		append_column(*column);
 	}
 	{	// --- I C O N --------------------------------------------------------
-		int index;
-		index=append_column(_(" "),model.icon);
-		Gtk::TreeView::Column* column = get_column(index-1);
+		Gtk::CellRendererPixbuf* cell_renderer_icon = Gtk::manage(new Gtk::CellRendererPixbuf());
+		Gtk::TreeViewColumn* column = manage(new Gtk::TreeViewColumn(" ", *cell_renderer_icon));
+		append_column(*column);
+		column->add_attribute(cell_renderer_icon->property_icon_name(), model.icon_name);
 		set_expander_column(*column);
 	}
 	{	// --- N A M E --------------------------------------------------------
@@ -109,6 +108,8 @@ LayerGroupTree::LayerGroupTree()
 	// This makes things easier to read.
 	set_rules_hint();
 
+	get_style_context()->add_class("layersets");
+
 	// Make us more sensitive to several events
 	add_events(Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK | Gdk::BUTTON1_MOTION_MASK | Gdk::BUTTON2_MOTION_MASK|Gdk::POINTER_MOTION_MASK);
 
@@ -121,8 +122,8 @@ LayerGroupTree::LayerGroupTree()
 
 LayerGroupTree::~LayerGroupTree()
 {
-	if (getenv("SYNFIG_DEBUG_DESTRUCTORS"))
-		synfig::info("LayerGroupTree::~LayerGroupTree(): Deleted");
+	DEBUG_LOG("SYNFIG_DEBUG_DESTRUCTORS",
+		"LayerGroupTree::~LayerGroupTree(): Deleted");
 }
 
 void

@@ -44,7 +44,6 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 using namespace synfigapp;
 
@@ -89,7 +88,7 @@ ValueDesc::get_description(bool show_exported_name)const
 		{
 			synfig::LinkableValueNode::Handle value_node(synfig::LinkableValueNode::Handle::cast_reinterpret(get_parent_value_node()));
 			description = strprintf("%s %s", _("ValueNode"),
-									value_node->get_description(get_index(), show_exported_name).c_str());
+									value_node->get_link_description(get_index(), show_exported_name).c_str());
 		}
 		else if (parent_is_value_node_const())
 		{

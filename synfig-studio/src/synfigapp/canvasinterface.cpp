@@ -84,7 +84,6 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 using namespace synfigapp;
 
@@ -96,7 +95,7 @@ using namespace synfigapp;
 
 /* === M E T H O D S ======================================================= */
 
-CanvasInterface::CanvasInterface(etl::loose_handle<Instance> instance,etl::handle<synfig::Canvas> canvas):
+CanvasInterface::CanvasInterface(etl::loose_handle<Instance> instance,Canvas::Handle canvas):
 	instance_(instance),
 	canvas_(canvas),
 	cur_time_(canvas->rend_desc().get_frame_start()),
@@ -109,8 +108,8 @@ CanvasInterface::CanvasInterface(etl::loose_handle<Instance> instance,etl::handl
 
 CanvasInterface::~CanvasInterface()
 {
-	if (getenv("SYNFIG_DEBUG_DESTRUCTORS"))
-		synfig::info("CanvasInterface::~CanvasInterface(): Deleted");
+	DEBUG_LOG("SYNFIG_DEBUG_DESTRUCTORS",
+		"CanvasInterface::~CanvasInterface(): Deleted");
 }
 
 void
@@ -129,8 +128,8 @@ CanvasInterface::set_time(synfig::Time x)
 
 	// update the time in all the child canvases
 	Canvas::Children children = get_canvas()->get_root()->children();
-	handle<CanvasInterface> interface;
-	for (Canvas::Children::iterator iter = children.begin(); iter != children.end(); iter++)
+	etl::handle<CanvasInterface> interface;
+	for (Canvas::Children::iterator iter = children.begin(); iter != children.end(); ++iter)
 		if ((interface = get_instance()->find_canvas_interface(*iter)) != this)
 			interface->set_time(interface->get_canvas()->get_time());
 
@@ -152,7 +151,7 @@ CanvasInterface::refresh_current_values()
 }
 
 etl::handle<CanvasInterface>
-CanvasInterface::create(etl::loose_handle<Instance> instance, etl::handle<synfig::Canvas> canvas)
+CanvasInterface::create(etl::loose_handle<Instance> instance, Canvas::Handle canvas)
 {
 	etl::handle<CanvasInterface> intrfc;
 	intrfc=new CanvasInterface(instance,canvas);
@@ -235,7 +234,7 @@ CanvasInterface::layer_create(
 		}
 
 	layer->set_canvas(canvas);
-	if (etl::handle<Layer_PasteCanvas>::cast_dynamic(layer))
+	if (Layer_PasteCanvas::Handle::cast_dynamic(layer))
 		layer->set_param("canvas", Canvas::create_inline(canvas));
 
 	return layer;
@@ -316,7 +315,7 @@ CanvasInterface::layer_set_defaults(const synfig::Layer::Handle &layer)
 				{
 					std::vector<ValueBase>::iterator iter2 = list.begin();
 					Type &type(iter2->get_type());
-					for (iter2++; iter2 != list.end(); iter2++)
+					for (++iter2; iter2 != list.end(); ++iter2)
 						if (iter2->get_type() != type)
 							break;
 					if (iter2 == list.end())
@@ -369,7 +368,7 @@ CanvasInterface::layer_set_defaults(const synfig::Layer::Handle &layer)
 							}
 						}
 					}
-					for (iter2 = list.begin(); iter2 != list.end(); iter2++)
+					for (iter2 = list.begin(); iter2 != list.end(); ++iter2)
 						if (iter2->get_type() != type_width_point)
 							break;
 					if (iter2 == list.end())
@@ -377,7 +376,7 @@ CanvasInterface::layer_set_defaults(const synfig::Layer::Handle &layer)
 						value_node=ValueNodeRegistry::create("wplist",iter->second);
 						ValueNode_WPList::Handle::cast_dynamic(value_node)->set_member_canvas(canvas);
 					}
-					for (iter2 = list.begin(); iter2 != list.end(); iter2++)
+					for (iter2 = list.begin(); iter2 != list.end(); ++iter2)
 						if (iter2->get_type() != type_dash_item)
 							break;
 					if (iter2 == list.end())
@@ -583,8 +582,7 @@ CanvasInterface::generate_param_list(const std::list<synfigapp::ValueDesc> &valu
 	param_list.add("canvas",get_canvas());
 
 	std::list<synfigapp::ValueDesc>::const_iterator iter;
-	for(iter=value_desc_list.begin();iter!=value_desc_list.end();++iter)
-	{
+	for (iter = value_desc_list.begin(); iter != value_desc_list.end(); ++iter) {
 		param_list.add("value_desc",*iter);
 		if(iter->is_value_node())
 		{
@@ -743,28 +741,25 @@ static void update_layer_size(const RendDesc& rend_desc, Layer::Handle& layer, b
 
 Layer::Handle
 CanvasInterface::import(
-	const synfig::String &filename,
-	synfig::String &errors,
-	synfig::String &warnings,
-	bool resize_image )
+	const synfig::filesystem::Path& filename,
+	synfig::String& errors,
+	synfig::String& warnings,
+	bool resize_image)
 {
 	Action::PassiveGrouper group(get_instance().get(),_("Import"));
 
 	synfig::info("Attempting to import %s", filename.c_str());
 	
-	String ext(filename_extension(filename));
-	//if (filename_extension(filename) == "")
-	if (ext == "")
-	{
+	String ext(filename.extension().u8string());
+	if (ext.empty()) {
 		get_ui_interface()->error(_("File name must have an extension!"));
 		return nullptr;
 	}
 
-	
 	if (ext.size()) ext = ext.substr(1); // skip initial '.'
-	std::transform(ext.begin(),ext.end(),ext.begin(),&::tolower);
+	strtolower(ext);
 
-	String short_filename = CanvasFileNaming::make_short_filename(get_canvas()->get_file_name(), filename);
+	String short_filename = CanvasFileNaming::make_short_filename(get_canvas()->get_file_name(), filename.u8string());
 	String full_filename = CanvasFileNaming::make_full_filename(get_canvas()->get_file_name(), short_filename);
 
 	if (ext=="pgo" || ext=="tsv" || ext=="xml")
@@ -778,7 +773,7 @@ CanvasInterface::import(
 			throw String(_("Unable to create \"Switch\" layer"));
 
 		layer_set_defaults(layer_switch);
-		layer_switch->set_description(etl::basename(filename));
+		layer_switch->set_description(filename.filename().u8string());
 
 		ValueNode_AnimatedFile::Handle animatedfile_node = ValueNode_AnimatedFile::create(String());
 		animatedfile_node->set_link("filename", ValueNode_Const::create(short_filename));
@@ -792,7 +787,7 @@ CanvasInterface::import(
 		String soundfile = animatedfile_node->get_file_field(0, "sound");
 		if (!soundfile.empty())
 		{
-			soundfile = etl::solve_relative_path(etl::dirname(full_filename), soundfile);
+			soundfile = filesystem::Path(full_filename).append(soundfile).u8string();
 			String short_soundfile = CanvasFileNaming::make_short_filename(get_canvas()->get_file_name(), soundfile);
 			//String full_soundfile = CanvasFileNaming::make_full_filename(get_canvas()->get_file_name(), short_soundfile);
 
@@ -801,7 +796,7 @@ CanvasInterface::import(
 				throw String(_("Unable to create \"Sound\" layer"));
 
 			layer_set_defaults(layer_sound);
-			layer_sound->set_description(etl::basename(filename));
+			layer_sound->set_description(filename.filename().u8string());
 			layer_sound->set_param("filename", ValueBase(short_soundfile));
 
 			if (!layer_add_action(layer_sound))
@@ -818,7 +813,7 @@ CanvasInterface::import(
 			throw String(_("Unable to create \"Sound\" layer"));
 
 		layer_set_defaults(layer);
-		layer->set_description(etl::basename(filename));
+		layer->set_description(filename.filename().u8string());
 		layer->set_param("filename", ValueBase(short_filename));
 
 		if (!layer_add_action(layer))
@@ -851,7 +846,7 @@ CanvasInterface::import(
 				return 0;
 			}
 		}
-		signal_layer_new_description()(_new_layer,etl::basename(filename));
+		signal_layer_new_description()(_new_layer, filename.filename().u8string());
 		return _new_layer;
 	}
 
@@ -876,23 +871,23 @@ CanvasInterface::import(
 		get_canvas()->register_external_canvas(full_filename, outside_canvas);
 
 		//layer->set_description(basename(filename));
-		signal_layer_new_description()(layer,etl::basename(filename));
+		signal_layer_new_description()(layer, filename.filename().u8string());
 		return layer;
 	}
 	catch (const String& x)
 	{
-		get_ui_interface()->error(filename + ": " + x);
+		get_ui_interface()->error(filename.u8string() + ": " + x);
 		return nullptr;
 	}
 	catch (...)
 	{
-		get_ui_interface()->error(_("Uncaught exception when attempting\nto open this composition -- ")+filename);
+		get_ui_interface()->error(_("Uncaught exception when attempting\nto open this composition -- ") + filename.u8string());
 		return nullptr;
 	}
 
 	if(!Importer::book().count(ext))
 	{
-		get_ui_interface()->error(_("I don't know how to open images of this type -- ")+ext);
+		get_ui_interface()->error(_("I don't know how to open images of this type -- ") + ext);
 		return nullptr;
 	}
 
@@ -905,7 +900,7 @@ CanvasInterface::import(
 			throw int();
 		update_layer_size(get_canvas()->rend_desc(), layer, resize_image);
 		layer->monitor(filename);
-		String desc = etl::basename(filename);
+		String desc = filename.filename().u8string();
 		layer->set_description(desc);
 		signal_layer_new_description()(layer, desc);
 		//get_instance()->set_selected_layer(get_canvas(), layer);
@@ -915,8 +910,8 @@ CanvasInterface::import(
 
 		//get_selection_manager()->set_selected_layer(layer);
 
-		//etl::handle<synfig::Canvas> canvas = get_canvas();
-		//etl::handle<CanvasView> view = get_instance()->find_canvas_view(canvas);
+		//Canvas::Handle canvas = get_canvas();
+		//CanvasView::Handle view = get_instance()->find_canvas_view(canvas);
 		//view->layer_tree->select_layer(layer);
 
 		// add imported layer into switch
@@ -941,7 +936,7 @@ CanvasInterface::import(
 	}
 	catch(...)
 	{
-		get_ui_interface()->error("Unable to import "+filename);
+		get_ui_interface()->error(strprintf(_("Unable to import %s"), filename.u8_str()));
 		group.cancel();
 		return nullptr;
 	}
@@ -950,9 +945,9 @@ CanvasInterface::import(
 
 bool
 CanvasInterface::import_sequence(
-	const std::set<synfig::String> &filenames,
-	synfig::String &errors,
-	synfig::String &/*warnings*/,
+	const std::set<synfig::filesystem::Path>& filenames,
+	synfig::String& errors,
+	synfig::String& /*warnings*/,
 	bool resize_image,
 	bool remove_dups)
 {
@@ -980,30 +975,30 @@ CanvasInterface::import_sequence(
 		rendering::Surface::Handle  cur_surface,prev_surface= rendering::Surface::Handle();
 		bool first_time=true;
 		int layers_count = 0;
-		std::set<String>::const_iterator c1= filenames.begin();
-		std::set<String>::const_iterator c2= filenames.begin();
+		std::set<filesystem::Path>::const_iterator c1 = filenames.begin();
+		std::set<filesystem::Path>::const_iterator c2 = filenames.begin();
 
-		while(c2!=filenames.end()){
-			const String &filename = *c2;
-			synfig::info("Attempting to import '%s' into sequence", filename.c_str());
+		while (c2 != filenames.end()) {
+			const filesystem::Path& filename = *c2;
+			synfig::info("Attempting to import '%s' into sequence", filename.u8_str());
 			
-			String ext(filename_extension(filename));
+			String ext(filename.extension().u8string());
 			if (!ext.empty()) ext = ext.substr(1); // skip initial '.'
-			std::transform(ext.begin(),ext.end(),ext.begin(),&::tolower);
+			strtolower(ext);
 			
 			if (ext.empty())
 			{
-				errors += etl::strprintf(_("Cannot import file without extension: %s\n"), filename.c_str());
+				errors += synfig::strprintf(_("Cannot import file without extension: %s\n"), filename.u8_str());
 				continue;
 			}
 			
 			if(!Importer::book().count(ext))
 			{
-				errors += etl::strprintf(_("Cannot import file of type '%s': %s\n"), ext.c_str(), filename.c_str());
+				errors += synfig::strprintf(_("Cannot import file of type '%s': %s\n"), ext.c_str(), filename.u8_str());
 				continue;
 			}
 			
-			String short_filename = CanvasFileNaming::make_short_filename(get_canvas()->get_file_name(), filename);
+			String short_filename = CanvasFileNaming::make_short_filename(get_canvas()->get_file_name(), filename.u8string());
 			
 			try {
 				layer = add_layer_to("Import",get_canvas());
@@ -1035,7 +1030,7 @@ CanvasInterface::import_sequence(
 				}
 				update_layer_size(get_canvas()->rend_desc(), layer, resize_image);
 				layer->monitor(filename);
-				String desc = etl::basename(filename);
+				String desc = filename.filename().u8string();
 				layer->set_description(desc);
 				signal_layer_new_description()(layer, desc);
 
@@ -1052,7 +1047,7 @@ CanvasInterface::import_sequence(
 				prev_surface=cur_surface;
 				advance(c2,1);
 			} catch(...) {
-				errors += etl::strprintf(_("Unable to import file: %s"), filename.c_str());
+				errors += synfig::strprintf(_("Unable to import file: %s"), filename.u8_str());
 				group.cancel();
 				return false;
 			}
@@ -1310,7 +1305,7 @@ CanvasInterface::set_meta_data(const synfig::String& key,const synfig::String& d
 	if (get_canvas()->get_meta_data(key) == data)
 		return;
 
-	if (key=="guide_x" || key=="guide_y")
+	if (key=="guide")
 	{
 		// Create an undoable action
 
@@ -1389,9 +1384,7 @@ _process_value_desc(const synfigapp::ValueDesc& value_desc,std::vector<synfigapp
 			}
 			// Process the linkable ValueNode's children
 			LinkableValueNode::Handle value_node_copy(LinkableValueNode::Handle::cast_dynamic(value_node));
-			int i;
-			for(i=0;i<value_node_copy->link_count();i++)
-			{
+			for (int i = 0; i < value_node_copy->link_count(); i++) {
 				ValueNode::Handle link(value_node_copy->get_link(i));
 				if(!link->is_exported())
 					ret+=_process_value_desc(ValueDesc(value_node_copy,i),out,guid_set);
@@ -1424,8 +1417,7 @@ CanvasInterface::find_important_value_descs(synfig::Canvas::Handle canvas,std::v
 
 	IndependentContext iter;
 
-	for(iter=canvas->get_independent_context();iter!=canvas->end();++iter)
-	{
+	for (iter = canvas->get_independent_context(); iter != canvas->end(); ++iter) {
 		Layer::Handle layer(*iter);
 
 		Layer::DynamicParamList::const_iterator iter;

@@ -88,8 +88,14 @@ extern void warning(const String &str);
 extern void info(const char *format,...);
 extern void info(const String &str);
 
-//! Returns absolute path to the binary
-extern String get_binary_path(const String &fallback_path);
+//#define LOGGING_ENABLED
+#ifdef LOGGING_ENABLED
+#define DEBUG_LOG(logger, fmt, ...) if (getenv(logger)) printf(fmt __VA_OPT__(,) __VA_ARGS__);
+#define DEBUG_GETENV(name) getenv(name)
+#else
+#define DEBUG_LOG(logger, fmt, ...) void (0)
+#define DEBUG_GETENV(name) false
+#endif
 
 }; // END of namespace synfig
 

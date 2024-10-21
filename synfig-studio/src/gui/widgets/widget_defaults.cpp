@@ -36,6 +36,7 @@
 
 #include <gui/widgets/widget_defaults.h>
 
+#include <gtkmm/icontheme.h>
 #include <gtkmm/stylecontext.h>
 #include <gtkmm/toolitem.h>
 #include <gtkmm/toolitemgroup.h>
@@ -213,14 +214,11 @@ Widget_Defaults::Widget_Defaults():
 		widget_fill_color->set_halign(Gtk::ALIGN_END);
 		widget_fill_color->set_valign(Gtk::ALIGN_END);
 
-		Gtk::Image* icon;
-
 		// Swap button
 		Gtk::Button* button_swap(manage(new Gtk::Button()));
 		button_swap->set_relief(Gtk::RELIEF_NONE);
 		button_swap->set_border_width(0);
-		icon = manage(new Gtk::Image(Gtk::StockID("synfig-swap_colors"), iconsize));
-		button_swap->add(*icon);
+		button_swap->set_image_from_icon_name("swap_colors_icon", iconsize);
 		button_swap->signal_clicked().connect(sigc::mem_fun(*this,&Widget_Defaults::on_swap_color_clicked));
 		button_swap->set_tooltip_text(_("Swap Fill and\nOutline Colors"));
 
@@ -232,8 +230,7 @@ Widget_Defaults::Widget_Defaults():
 		Gtk::Button* button_reset(manage(new Gtk::Button()));
 		button_reset->set_relief(Gtk::RELIEF_NONE);
 		button_reset->set_border_width(0);
-		icon = manage(new Gtk::Image(Gtk::StockID("synfig-reset_colors"), iconsize));
-		button_reset->add(*icon);
+		button_reset->set_image_from_icon_name("reset_colors_icon", iconsize);
 		button_reset->signal_clicked().connect(sigc::mem_fun(*this,&Widget_Defaults::on_reset_color_clicked));
 		button_reset->set_tooltip_text(_("Reset Colors to Black and White"));
 
@@ -258,13 +255,23 @@ Widget_Defaults::Widget_Defaults():
 	widget_brush->set_size_request(56, 48);
 	widget_brush->set_tooltip_text(_("Brush Preview"));
 
-	brush_increase = Gtk::manage(new class Gtk::Button("+"));
+	const auto icon_theme = Gtk::IconTheme::get_default();
+
+	brush_increase = Gtk::manage(new Gtk::Button());
+	if (icon_theme->has_icon("brush_size_increase_icon"))
+		brush_increase->set_image_from_icon_name("brush_size_increase_icon", iconsize);
+	else
+		brush_increase->set_label("+");
 	brush_increase->set_tooltip_text(_("Increase brush size"));
 	brush_increase->set_relief(Gtk::RELIEF_NONE);
 	brush_increase->set_border_width(0);
 	brush_increase->signal_clicked().connect(sigc::mem_fun(*this,&studio::Widget_Defaults::on_brush_increase_clicked));
 
-	brush_decrease = Gtk::manage(new class Gtk::Button("-"));
+	brush_decrease = Gtk::manage(new Gtk::Button());
+	if (icon_theme->has_icon("brush_size_decrease_icon"))
+		brush_decrease->set_image_from_icon_name("brush_size_decrease_icon", iconsize);
+	else
+		brush_decrease->set_label("-");
 	brush_decrease->set_tooltip_text(_("Decrease brush size"));
 	brush_decrease->set_relief(Gtk::RELIEF_NONE);
 	brush_decrease->set_border_width(0);
@@ -358,7 +365,7 @@ Widget_Defaults::Widget_Defaults():
 		//widget_brush_bline_width->show_all();
 
 		Gtk::ToolItemGroup *tool_item_group = manage(new class Gtk::ToolItemGroup());
-		gtk_tool_item_group_set_label(tool_item_group->gobj(), NULL);
+		gtk_tool_item_group_set_label(tool_item_group->gobj(), nullptr);
 
 		Gtk::ToolPalette *palette = manage(new Gtk::ToolPalette());
 		palette->add(*tool_item_group);

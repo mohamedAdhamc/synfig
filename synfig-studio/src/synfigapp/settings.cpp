@@ -38,16 +38,17 @@
 #include <algorithm>
 #include <sys/stat.h>
 #include "settings.h"
+#include <synfig/filesystem.h>
 #include <synfig/general.h>
 #include <synfig/guid.h>
 
 #include <synfigapp/localization.h>
+#include <glib/gstdio.h> // for g_rename(...)
 
 #endif
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 using namespace synfigapp;
 
@@ -184,15 +185,18 @@ Settings::get_key_list()const
 }
 
 bool
-Settings::save_to_file(const synfig::String& filename)const
+Settings::save_to_file(const synfig::filesystem::Path& filename)const
 {
-	synfig::String tmp_filename(filename+".TMP");
+	synfig::filesystem::Path tmp_filename(filename + std::string(".TMP"));
 
 	try
 	{
 		std::ofstream file(tmp_filename.c_str());
 
-		if(!file)return false;
+		if(!file) {
+			synfig::warning(_("Can't save settings to file %s!"), filename.c_str());
+			return false;
+		}
 
 		KeyList key_list(get_key_list());
 
@@ -211,39 +215,22 @@ Settings::save_to_file(const synfig::String& filename)const
 			return false;
 	}catch(...) { return false; }
 
-#ifdef _WIN32
-
-	// On Win32 platforms, rename() has bad behavior. Work around it.
-
-	// Make random filename and ensure there's no file with such name exist
-	struct stat buf;
-	String old_file;
-	do {
-		synfig::GUID guid;
-		old_file = filename+"."+guid.get_string().substr(0,8);
-	} while (stat(old_file.c_str(), &buf) != -1);
-
-	rename(filename.c_str(),old_file.c_str());
-	if(rename(tmp_filename.c_str(),filename.c_str())!=0)
-	{
-		rename(old_file.c_str(),filename.c_str());
+	if (g_rename(tmp_filename.u8_str(), filename.u8_str()) != 0)
 		return false;
-	}
-	remove(old_file.c_str());
-#else
-	if(rename(tmp_filename.c_str(),filename.c_str())!=0)
-		return false;
-#endif
 
 	return true;
 }
 
 bool
-Settings::load_from_file(const synfig::String& filename, const synfig::String& key_filter )
+Settings::load_from_file(const synfig::filesystem::Path& filename, const synfig::String& key_filter)
 {
 	std::ifstream file(filename.c_str());
-	if(!file)
+
+	if(!file) {
+		synfig::warning(_("Can't load settings from file %s!"), filename.u8_str());
 		return false;
+	}
+
 	bool loaded_filter = false;
 	while(file)
 	{
@@ -325,6 +312,13 @@ Settings::get_value(const synfig::String &key, const synfig::Distance &default_v
 	return get_raw_value(key, value) ? Distance(value) : default_value;
 }
 
+synfig::filesystem::Path
+Settings::get_value(const synfig::String &key, const synfig::filesystem::Path& default_value) const
+{
+	synfig::String value;
+	return get_raw_value(key, value) ? filesystem::Path(value) : default_value;
+}
+
 synfig::String
 Settings::get_value(const synfig::String& key, const synfig::String& default_value) const {
 	synfig::String value;
@@ -364,7 +358,13 @@ bool
 Settings::set_value(const synfig::String &key, const synfig::Distance &value)
 {
 	ChangeLocale change_locale(LC_NUMERIC, "C");
-	return set_value(key, value.get_string());
+	return set_value(key, value.get_string(8));
+}
+
+bool
+Settings::set_value(const synfig::String &key, const synfig::filesystem::Path& value)
+{
+	return set_value(key, value.u8string());
 }
 
 bool

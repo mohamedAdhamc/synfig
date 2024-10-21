@@ -54,7 +54,7 @@ using namespace synfig;
 /* === G L O B A L S ======================================================= */
 
 SYNFIG_LAYER_INIT(Layer_SolidColor);
-SYNFIG_LAYER_SET_NAME(Layer_SolidColor,"SolidColor"); // todo: use solid_color
+SYNFIG_LAYER_SET_NAME(Layer_SolidColor,"solid_color");
 SYNFIG_LAYER_SET_LOCAL_NAME(Layer_SolidColor,N_("Solid Color"));
 SYNFIG_LAYER_SET_CATEGORY(Layer_SolidColor,N_("Geometry"));
 SYNFIG_LAYER_SET_VERSION(Layer_SolidColor,"0.1");
@@ -123,15 +123,22 @@ synfig::Layer::Handle
 Layer_SolidColor::hit_check(synfig::Context context, const synfig::Point &point)const
 {
 	Color color=param_color.get(Color());
+
+	bool check_myself_first;
+	auto layer = basic_hit_check(context, point, check_myself_first);
+
+	if (!check_myself_first)
+		return layer;
+
 	if(get_blend_method()==Color::BLEND_STRAIGHT && get_amount()>=0.5)
 		return const_cast<Layer_SolidColor*>(this);
 	else
 	if(get_blend_method()==Color::BLEND_COMPOSITE && get_amount()*color.get_a()>=0.5)
 		return const_cast<Layer_SolidColor*>(this);
 
-	Layer::Handle layer(context.hit_check(point));
+	layer = context.hit_check(point);
 
-	return layer?layer:const_cast<Layer_SolidColor*>(this);
+	return layer ? layer : const_cast<Layer_SolidColor*>(this);
 }
 
 Color

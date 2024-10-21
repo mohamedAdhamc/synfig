@@ -37,7 +37,7 @@
 #include <vector>
 #include <algorithm>
 
-#include <ETL/clock>
+#include "synfig/clock.h"
 
 #include "target_tile.h"
 
@@ -177,7 +177,7 @@ synfig::Target_Tile::render_frame_(Canvas::Handle canvas, ContextParams context_
 {
 	const RendDesc &rend_desc(desc);
 
-	etl::clock tile_timer;
+	synfig::clock tile_timer;
 	tile_timer.reset();
 
 	// Gather tiles
@@ -227,7 +227,7 @@ synfig::Target_Tile::render_frame_(Canvas::Handle canvas, ContextParams context_
 
 bool
 synfig::Target_Tile::async_render_tile(
-	etl::handle<Canvas> canvas,
+	Canvas::Handle canvas,
 	ContextParams context_params,
 	RectInt rect,
 	RendDesc tile_desc,

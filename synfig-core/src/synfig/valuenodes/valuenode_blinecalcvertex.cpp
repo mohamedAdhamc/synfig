@@ -42,7 +42,6 @@
 #include <synfig/localization.h>
 #include <synfig/valuenode_registry.h>
 #include <synfig/exception.h>
-#include <ETL/hermite>
 
 #endif
 
@@ -55,7 +54,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_BLineCalcVertex, RELEASE_VERSION_0_61_07, "blinecalcvertex", "Spline Vertex")
+REGISTER_VALUENODE(ValueNode_BLineCalcVertex, RELEASE_VERSION_0_61_07, "blinecalcvertex", N_("Spline Vertex"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -64,8 +63,7 @@ REGISTER_VALUENODE(ValueNode_BLineCalcVertex, RELEASE_VERSION_0_61_07, "blinecal
 ValueNode_BLineCalcVertex::ValueNode_BLineCalcVertex(Type &x):
 	LinkableValueNode(x)
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	if(x!=type_vector)
 		throw Exception::BadType(x.description.local_name);
 
@@ -96,8 +94,8 @@ ValueNode_BLineCalcVertex::~ValueNode_BLineCalcVertex()
 ValueBase
 ValueNode_BLineCalcVertex::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	const ValueBase::List bline = (*bline_)(t).get_list();
 	const ValueBase bline_value_node = (*bline_)(t);
@@ -117,14 +115,14 @@ ValueNode_BLineCalcVertex::operator()(Time t)const
 	if (amount > 1) amount = 1;
 	amount *= count;
 
-	int i0 = std::max(0, std::min(size-1, (int)floor(amount)));
+	int i0 = synfig::clamp((int)floor(amount), 0, size-1);
 	int i1 = (i0 + 1) % size;
 	Real part = amount - i0;
 
 	const BLinePoint &blinepoint0 = bline[i0].get(BLinePoint());
 	const BLinePoint &blinepoint1 = bline[i1].get(BLinePoint());
 
-	etl::hermite<Vector> curve(blinepoint0.get_vertex(),   blinepoint1.get_vertex(),
+	hermite<Vector> curve(blinepoint0.get_vertex(),   blinepoint1.get_vertex(),
 							   blinepoint0.get_tangent2(), blinepoint1.get_tangent1());
 	return curve(part);
 }
@@ -174,22 +172,22 @@ ValueNode_BLineCalcVertex::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"bline")
+	ret.push_back(ParamDesc("bline")
 		.set_local_name(_("Spline"))
 		.set_description(_("The spline where the vertex is linked to"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"loop")
+	ret.push_back(ParamDesc("loop")
 		.set_local_name(_("Loop"))
 		.set_description(_("When checked, the amount would loop"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"amount")
+	ret.push_back(ParamDesc("amount")
 		.set_local_name(_("Amount"))
 		.set_description(_("The position of the linked vertex on the Spline (0,1]"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"homogeneous")
+	ret.push_back(ParamDesc("homogeneous")
 		.set_local_name(_("Homogeneous"))
 		.set_description(_("When checked, the position is Spline length based"))
 	);

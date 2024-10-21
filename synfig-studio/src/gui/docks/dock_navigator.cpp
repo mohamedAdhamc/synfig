@@ -102,7 +102,7 @@ Widget_NavView::~Widget_NavView()
 	{ set_canvas_view( CanvasView::LooseHandle() ); }
 
 void
-Widget_NavView::set_canvas_view(const etl::loose_handle<CanvasView> &x)
+Widget_NavView::set_canvas_view(const CanvasView::LooseHandle &x)
 {
 	if (canvas_view == x) return;
 
@@ -232,7 +232,7 @@ Widget_NavView::on_number_modify()
 	// map: -4,4 -> small number,1600 with 100 at 0
 	// f(x) = 100*2^x
 	double z = pow(2.0, adj_zoom->get_value());
-	zoom_print.set_text(etl::strprintf("%.1f%%", z*100.0));
+	zoom_print.set_text(synfig::strprintf("%.1f%%", z*100.0));
 	if(get_canvas_view() && z != get_canvas_view()->get_work_area()->get_zoom()) {
 		struct Lock {
 			int &i;
@@ -314,7 +314,7 @@ Dock_Navigator::~Dock_Navigator()
 { }
 
 void
-Dock_Navigator::changed_canvas_view_vfunc(etl::loose_handle<CanvasView> canvas_view)
+Dock_Navigator::changed_canvas_view_vfunc(CanvasView::LooseHandle canvas_view)
 {
 	navview.set_canvas_view(canvas_view);
 }

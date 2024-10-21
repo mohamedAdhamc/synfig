@@ -51,7 +51,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_DotProduct, RELEASE_VERSION_0_61_09, "dotproduct", "Dot Product")
+REGISTER_VALUENODE(ValueNode_DotProduct, RELEASE_VERSION_0_61_09, "dotproduct", N_("Dot Product"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -60,8 +60,7 @@ REGISTER_VALUENODE(ValueNode_DotProduct, RELEASE_VERSION_0_61_09, "dotproduct", 
 ValueNode_DotProduct::ValueNode_DotProduct(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	Type &type(value.get_type());
 	if (type == type_real)
 	{
@@ -98,8 +97,8 @@ ValueNode_DotProduct::~ValueNode_DotProduct()
 ValueBase
 ValueNode_DotProduct::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	Vector lhs((*lhs_)(t).get(Vector()));
 	Vector rhs((*rhs_)(t).get(Vector()));
@@ -159,12 +158,12 @@ ValueNode_DotProduct::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"lhs")
+	ret.push_back(ParamDesc("lhs")
 		.set_local_name(_("LHS"))
 		.set_description(_("The left side of the dot product"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"rhs")
+	ret.push_back(ParamDesc("rhs")
 		.set_local_name(_("RHS"))
 		.set_description(_("The right side of the dot product"))
 	);

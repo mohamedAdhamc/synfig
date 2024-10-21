@@ -51,7 +51,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Not, RELEASE_VERSION_0_62_00, "not", "NOT")
+REGISTER_VALUENODE(ValueNode_Not, RELEASE_VERSION_0_62_00, "not", N_("NOT"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -60,8 +60,7 @@ REGISTER_VALUENODE(ValueNode_Not, RELEASE_VERSION_0_62_00, "not", "NOT")
 ValueNode_Not::ValueNode_Not(const ValueBase &x):
 	LinkableValueNode(x.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	bool value(x.get(bool()));
 
 	set_link("link",         ValueNode_Const::create(!value));
@@ -108,8 +107,8 @@ ValueNode_Not::get_link_vfunc(int i)const
 ValueBase
 ValueNode_Not::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	bool link      = (*link_)    (t).get(bool());
 
@@ -132,7 +131,7 @@ ValueNode_Not::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"link")
+	ret.push_back(ParamDesc("link")
 		.set_local_name(_("Link"))
 		.set_description(_("Value node used to do the NOT operation"))
 	);

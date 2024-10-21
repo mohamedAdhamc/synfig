@@ -53,8 +53,8 @@ EXTRA_DIST = \
 	valuenode_icon.sif \
 	wallpaper.sif \
 	rename_icon.sif \
-	set_fill_color.sif \
-	set_outline_color.sif \
+	set_fill_color_icon.sif \
+	set_outline_color_icon.sif \
 	duck_position_icon.sif \
 	duck_vertex_icon.sif \
 	duck_tangent_icon.sif \
@@ -79,7 +79,9 @@ EXTRA_DIST = \
 	action_flat_interpolation_icon.sif \
 	action_interpolate_interpolation_icon.sif \
 	action_peak_interpolation_icon.sif \
+	action_offpeak_interpolation_icon.sif \
 	action_rounded_interpolation_icon.sif \
+	action_innerrounded_interpolation_icon.sif \
 	action_squared_interpolation_icon.sif \
 	\
 	action_doc_icons.sif \
@@ -92,12 +94,14 @@ EXTRA_DIST = \
 	layer_distortion_curvewarp_icon.sif \
 	layer_distortion_insideout_icon.sif \
 	layer_distortion_noise_icon.sif \
+	layer_distortion_skeletondeformation_icon.sif \
 	layer_distortion_spherize_icon.sif \
 	layer_distortion_stretch_icon.sif \
 	layer_distortion_twirl_icon.sif \
 	layer_distortion_warp_icon.sif \
 	layer_example_metaballs_icon.sif \
 	layer_example_simplecircle_icon.sif \
+	layer_filter_chromakey_icon.sif \
 	layer_filter_clamp_icon.sif \
 	layer_filter_colorcorrect_icon.sif \
 	layer_filter_halftone2_icon.sif \
@@ -121,12 +125,15 @@ EXTRA_DIST = \
 	layer_gradient_radial_icon.sif \
 	layer_gradient_spiral_icon.sif \
 	layer_other_duplicate_icon.sif \
+	layer_other_filtergroup_icon.sif \
 	layer_other_group_icon.sif \
+	layer_other_ghostgroup_icon.sif \
 	layer_other_plant_icon.sif \
 	layer_other_stroboscope_icon.sif \
 	layer_other_supersample_icon.sif \
 	layer_other_skeleton_icon.sif \
 	layer_other_sound_icon.sif \
+	layer_other_freetime_icon.sif \
 	layer_other_switch_icon.sif \
 	layer_other_text_icon.sif \
 	layer_other_timeloop_icon.sif \
@@ -147,6 +154,8 @@ EXTRA_DIST = \
 	resize_down_icon.sif \
 	resize_down_right_icon.sif \
 	resize_transparent_icon.sif \
+	\
+	tangent_merge_split_icons.sif \
 	\
 	tool_brush_icon.sif \
 	tool_cutout_icon.sif \
@@ -195,6 +204,7 @@ EXTRA_DIST = \
 	navigator_icon.sif \
 	palette_icon.sif \
 	parameters_icon.sif \
+	sound_icon.sif \
 	time_track_icon.sif \
 	\
 	utils_chain_link_icons.sif \
@@ -241,8 +251,8 @@ ICONS = \
 	animate_mode_on_icon.$(EXT) \
 	\
 	rename_icon.$(EXT) \
-	set_fill_color.$(EXT) \
-	set_outline_color.$(EXT) \
+	set_fill_color_icon.$(EXT) \
+	set_outline_color_icon.$(EXT) \
 	duck_position_icon.$(EXT) \
 	duck_vertex_icon.$(EXT) \
 	duck_tangent_icon.$(EXT) \
@@ -267,7 +277,9 @@ ICONS = \
 	action_flat_interpolation_icon.$(EXT) \
 	action_interpolate_interpolation_icon.$(EXT) \
 	action_peak_interpolation_icon.$(EXT) \
+	action_offpeak_interpolation_icon.$(EXT) \
 	action_rounded_interpolation_icon.$(EXT) \
+	action_innerrounded_interpolation_icon.$(EXT) \
 	action_squared_interpolation_icon.$(EXT) \
 	\
 	action_doc_new_icon.$(EXT) \
@@ -291,12 +303,14 @@ ICONS = \
 	layer_distortion_curvewarp_icon.$(EXT) \
 	layer_distortion_insideout_icon.$(EXT) \
 	layer_distortion_noise_icon.$(EXT) \
+	layer_distortion_skeletondeformation_icon.$(EXT) \
 	layer_distortion_spherize_icon.$(EXT) \
 	layer_distortion_stretch_icon.$(EXT) \
 	layer_distortion_twirl_icon.$(EXT) \
 	layer_distortion_warp_icon.$(EXT) \
 	layer_example_metaballs_icon.$(EXT) \
 	layer_example_simplecircle_icon.$(EXT) \
+	layer_filter_chromakey_icon.$(EXT) \
 	layer_filter_clamp_icon.$(EXT) \
 	layer_filter_colorcorrect_icon.$(EXT) \
 	layer_filter_halftone2_icon.$(EXT) \
@@ -321,8 +335,11 @@ ICONS = \
 	layer_gradient_spiral_icon.$(EXT) \
 	layer_other_duplicate_icon.$(EXT) \
 	layer_other_importimage_icon.$(EXT) \
+	layer_other_filtergroup_icon.$(EXT) \
 	layer_other_group_icon.$(EXT) \
+	layer_other_ghostgroup_icon.$(EXT) \
 	layer_other_plant_icon.$(EXT) \
+	layer_other_freetime_icon.$(EXT) \
 	layer_other_stroboscope_icon.$(EXT) \
 	layer_other_supersample_icon.$(EXT) \
 	layer_other_skeleton_icon.$(EXT) \
@@ -347,6 +364,9 @@ ICONS = \
 	resize_down_icon.$(EXT) \
 	resize_down_right_icon.$(EXT) \
 	resize_transparent_icon.$(EXT) \
+	\
+	tangent_merge_icon.$(EXT) \
+	tangent_split_icon.$(EXT) \
 	\
 	tool_brush_icon.$(EXT) \
 	tool_cutout_icon.$(EXT) \
@@ -396,6 +416,7 @@ ICONS = \
 	navigator_icon.$(EXT) \
 	palette_icon.$(EXT) \
 	parameters_icon.$(EXT) \
+	sound_icon.$(EXT) \
 	time_track_icon.$(EXT) \
 	\
 	utils_chain_link_on_icon.$(EXT) \
@@ -442,10 +463,10 @@ appicondir= $(datadir)/icons/hicolor
 imagedir = $(synfig_datadir)/images
 image_DATA = $(IMAGES)
 
-classicthemedir="${synfig_datadir}/icons/classic"
-dist_classictheme_DATA=index.theme
+classicthemedir = ${synfig_datadir}/icons/classic
+dist_classictheme_DATA = index.theme
 
-iconsdir="${classicthemedir}/128x128"
+iconsdir = ${classicthemedir}/128x128
 icons_DATA = $(ICONS)
 
 win32iconsdir = $(datadir)/pixmaps
@@ -617,6 +638,16 @@ canvas_icon.$(EXT): $(srcdir)/canvas_and_importimage_icons.sif
 	echo " Delete \"\$$INSTDIR\\share\\pixmaps\\$@\"" >>./unimages.nsh
 
 layer_other_importimage_icon.$(EXT): $(srcdir)/canvas_and_importimage_icons.sif
+	$(SYNFIG) --quiet $< -o $@ --time 1f
+	echo " File \"images\\$@\"" >>./images.nsh
+	echo " Delete \"\$$INSTDIR\\share\\pixmaps\\$@\"" >>./unimages.nsh
+
+tangent_merge_icon.$(EXT): $(srcdir)/tangent_merge_split_icons.sif
+	$(SYNFIG) --quiet $< -o $@ --time 0f
+	echo " File \"images\\$@\"" >>./images.nsh
+	echo " Delete \"\$$INSTDIR\\share\\pixmaps\\$@\"" >>./unimages.nsh
+
+tangent_split_icon.$(EXT): $(srcdir)/tangent_merge_split_icons.sif
 	$(SYNFIG) --quiet $< -o $@ --time 1f
 	echo " File \"images\\$@\"" >>./images.nsh
 	echo " Delete \"\$$INSTDIR\\share\\pixmaps\\$@\"" >>./unimages.nsh

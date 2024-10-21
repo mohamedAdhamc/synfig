@@ -50,7 +50,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Cos, RELEASE_VERSION_0_61_08, "cos", "Cos")
+REGISTER_VALUENODE(ValueNode_Cos, RELEASE_VERSION_0_61_08, "cos", N_("Cos"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -59,8 +59,7 @@ REGISTER_VALUENODE(ValueNode_Cos, RELEASE_VERSION_0_61_08, "cos", "Cos")
 ValueNode_Cos::ValueNode_Cos(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	if (value.get_type() == type_real)
 	{
 		set_link("angle",ValueNode_Const::create(Angle::deg(0)));
@@ -92,8 +91,8 @@ ValueNode_Cos::~ValueNode_Cos()
 ValueBase
 ValueNode_Cos::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	return
 		Angle::cos(
@@ -146,12 +145,12 @@ ValueNode_Cos::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"angle")
+	ret.push_back(ParamDesc("angle")
 		.set_local_name(_("Angle"))
 		.set_description(_("Value to calculate the cosine"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"amp")
+	ret.push_back(ParamDesc("amp")
 		.set_local_name(_("Amplitude"))
 		.set_description(_("Multiplier of the resulting cosine"))
 	);

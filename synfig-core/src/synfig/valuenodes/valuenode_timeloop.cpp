@@ -50,7 +50,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_TimeLoop, RELEASE_VERSION_0_61_08, "timeloop", "Time Loop")
+REGISTER_VALUENODE(ValueNode_TimeLoop, RELEASE_VERSION_0_61_08, "timeloop", N_("Time Loop"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -59,13 +59,13 @@ REGISTER_VALUENODE(ValueNode_TimeLoop, RELEASE_VERSION_0_61_08, "timeloop", "Tim
 ValueNode_TimeLoop::ValueNode_TimeLoop(Type &x):
 	LinkableValueNode(x)
 {
+	init_children_vocab();
 }
 
 ValueNode_TimeLoop::ValueNode_TimeLoop(const ValueNode::Handle &x):
 	LinkableValueNode(x->get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	set_link("link", x);
 	set_link("link_time",  ValueNode_Const::create(Time(0)));
 	set_link("local_time", ValueNode_Const::create(Time(0)));
@@ -120,8 +120,8 @@ ValueNode_TimeLoop::get_link_vfunc(int i)const
 ValueBase
 ValueNode_TimeLoop::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	Time link_time  = (*link_time_) (t).get(Time());
 	Time local_time = (*local_time_)(t).get(Time());

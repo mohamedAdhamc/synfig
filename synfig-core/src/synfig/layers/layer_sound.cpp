@@ -79,7 +79,11 @@ Layer_Sound::Layer_Sound():
 bool
 Layer_Sound::set_param(const String &param, const ValueBase &value)
 {
-	IMPORT_VALUE(param_filename);
+	IMPORT_VALUE_PLUS(param_filename,
+		{
+			param_filename = FileSystem::fix_slashes(value.get(String()));
+		}
+		);
 	IMPORT_VALUE(param_delay);
 	IMPORT_VALUE(param_volume);
 
@@ -135,6 +139,8 @@ Layer_Sound::fill_sound_processor(SoundProcessor &soundProcessor) const
 	String filename = param_filename.get(String());
 	filename = CanvasFileNaming::make_full_filename(get_canvas()->get_file_name(), filename);
 	filename = get_canvas()->get_file_system()->get_real_uri(filename);
+	if (filename.empty())
+		return;
 	filename = Glib::filename_from_uri(filename);
 	if (filename.empty())
 		return;

@@ -34,16 +34,12 @@
 #endif
 
 #include "valuenode_dilist.h"
-#include "valuenode_const.h"
 #include "valuenode_composite.h"
-#include "valuenode_bline.h"
 #include <synfig/general.h>
 #include <synfig/localization.h>
 #include <synfig/valuenode_registry.h>
 #include <synfig/exception.h>
 #include <synfig/dashitem.h>
-
-#include <ETL/stringf>
 
 #include <vector>
 #include <list>
@@ -58,7 +54,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_DIList, RELEASE_VERSION_0_63_01, "dilist", "DIList")
+REGISTER_VALUENODE(ValueNode_DIList, RELEASE_VERSION_0_63_01, "dilist", N_("DIList"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -79,7 +75,7 @@ ValueNode_DIList::create(const ValueBase& value, etl::loose_handle<Canvas>)
 {
 	// if the parameter is not a list type, return null
 	if(value.get_type()!=type_list)
-		return NULL;
+		return nullptr;
 	// create an empty list
 	ValueNode_DIList* value_node(new ValueNode_DIList());
 	// If the value parameter is not empty
@@ -101,7 +97,7 @@ ValueNode_DIList::create(const ValueBase& value, etl::loose_handle<Canvas>)
 		{
 			// We got a list of who-knows-what. We don't have any idea
 			// what to do with it.
-			return NULL;
+			return nullptr;
 		}
 	}
 
@@ -132,8 +128,8 @@ ValueNode_DIList::create_list_entry(int index, Time time, Real /*origin*/)
 ValueBase
 ValueNode_DIList::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	std::vector<DashItem> ret_list;
 
@@ -171,10 +167,8 @@ String
 ValueNode_DIList::link_local_name(int i)const
 {
 	assert(i>=0 && (unsigned)i<list.size());
-	return etl::strprintf(_("DashItem %03d"),i+1);
+	return strprintf(_("DashItem %03d"),i+1);
 }
-
-
 
 LinkableValueNode*
 ValueNode_DIList::create_new()const
@@ -187,16 +181,3 @@ ValueNode_DIList::check_type(Type &type)
 {
 	return type==type_list;
 }
-
-ValueNode::LooseHandle
-ValueNode_DIList::get_bline()const
-{
-	return bline_;
-}
-
-void
-ValueNode_DIList::set_bline(ValueNode::Handle b)
-{
-	bline_=b;
-}
-

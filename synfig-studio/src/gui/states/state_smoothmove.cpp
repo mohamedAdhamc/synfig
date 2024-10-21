@@ -55,7 +55,6 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 using namespace studio;
 
@@ -93,7 +92,7 @@ public:
 
 class studio::StateSmoothMove_Context : public sigc::trackable
 {
-	etl::handle<CanvasView> canvas_view_;
+	CanvasView::Handle canvas_view_;
 	CanvasView::IsWorking is_working;
 
 	//Duckmatic::Push duckmatic_push;
@@ -127,7 +126,7 @@ public:
 
 	~StateSmoothMove_Context();
 
-	const etl::handle<CanvasView>& get_canvas_view()const{return canvas_view_;}
+	const CanvasView::Handle& get_canvas_view()const{return canvas_view_;}
 	etl::handle<synfigapp::CanvasInterface> get_canvas_interface()const{return canvas_view_->canvas_interface();}
 	synfig::Canvas::Handle get_canvas()const{return canvas_view_->get_canvas();}
 	WorkArea * get_work_area()const{return canvas_view_->get_work_area();}
@@ -139,7 +138,7 @@ public:
 /* === M E T H O D S ======================================================= */
 
 StateSmoothMove::StateSmoothMove():
-	Smach::state<StateSmoothMove_Context>("smooth_move")
+	Smach::state<StateSmoothMove_Context>("smooth_move", N_("Smooth Move Tool"))
 {
 	insert(event_def(EVENT_REFRESH_TOOL_OPTIONS,&StateSmoothMove_Context::event_refresh_tool_options));
 	insert(event_def(EVENT_STOP,&StateSmoothMove_Context::event_stop_handler));
@@ -364,7 +363,9 @@ DuckDrag_SmoothMove::end_duck_drag(Duckmatic* duckmatic)
 
 		int i;
 
-		smart_ptr<OneMoment> wait;if(selected_ducks.size()>20)wait.spawn();
+		std::shared_ptr<OneMoment> wait;
+		if (selected_ducks.size() > 20)
+			wait = std::make_shared<OneMoment>();
 
 		for(i=0,iter=selected_ducks.begin();iter!=selected_ducks.end();++iter,i++)
 		{

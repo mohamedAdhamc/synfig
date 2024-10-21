@@ -1,5 +1,5 @@
+/* === S Y N F I G ========================================================= */
 /*! ========================================================================
-** Extended Template and Library
 ** \file _smach.h
 ** \brief State Machine Abstraction Class Implementation
 ** \internal
@@ -28,15 +28,20 @@
 
 /* === S T A R T =========================================================== */
 
-#ifndef __ETL__SMACH_H_
-#define __ETL__SMACH_H_
+#ifndef SYNFIG_GUI__SMACH_H
+#define SYNFIG_GUI__SMACH_H
 
 /* === H E A D E R S ======================================================= */
 
 #include <cassert>
-#include <vector>
+
 #include <algorithm>
 #include <stdexcept>
+#include <vector>
+
+#include <synfig/misc.h>
+
+#include <gui/localization.h>
 
 /* === M A C R O S ========================================================= */
 
@@ -47,7 +52,7 @@
 
 /* === C L A S S E S & S T R U C T S ======================================= */
 
-namespace etl {
+namespace studio {
 
 /*! ========================================================================
 ** \class	smach
@@ -73,10 +78,10 @@ public:
 	{
 		// These values are returned by the event
 		// handlers cast to state pointers.
-		RESULT_ERROR,		//!< General error or malfunction
-		RESULT_OK,			//!< Event has been processed
-		RESULT_ACCEPT,		//!< The event has been explicitly accepted.
-		RESULT_REJECT,		//!< The event has been explicitly rejected.
+		RESULT_ERROR,		//!< Tool/state processed the event and found a general error or malfunction
+		RESULT_OK,			//!< Tool/state processed the event or not, but let it be processed (too) by other handlers in the event pipeline (WorkArea, Gtk App, etc)
+		RESULT_ACCEPT,		//!< Tool/state processed the event and consumed the event
+		RESULT_REJECT,		//!< Tool/state processed the event and/or forbid the event
 
 		RESULT_END			//!< Not a valid result
 	};
@@ -139,6 +144,12 @@ public:
 
 		//! Copy constructor
 		event_def_internal(const event_def_internal &x):id(x.id),handler(x.handler) { }
+		event_def_internal& operator=(const event_def_internal& x)
+		{
+			id = x.id;
+			handler = x.handler;
+			return *this;
+		}
 
 	};
 
@@ -155,7 +166,8 @@ public:
 
 		virtual event_result process_event(void* state_context,const event& id)const=0;
 
-		virtual const char *get_name() const=0;
+		virtual const char* get_name() const = 0;
+		virtual const char* get_local_name() const = 0;
 	};
 
 	//! State class
@@ -174,16 +186,17 @@ public:
 
 		std::vector<event_def> event_list;
 
-		smach *nested;		//! Nested machine
-		event_key low,high;	//! Lowest and Highest event values
-		const char *name;	//! Name of the state
-		typename event_def::funcptr default_handler;	//! Default handler for unknown key
+		smach* nested;                               /*!< Nested machine */
+		event_key low, high;                         /*!< Lowest and Highest event values */
+		const char* name;                            /*!< Name of the state */
+		const char* local_name_;                     /*!< Local name (used by GUI) */
+		typename event_def::funcptr default_handler; /*!< Default handler for unknown key */
 
 	public:
 
 		//! Constructor
-		state(const char *n, smach* nest=0):
-			nested(nest),name(n),default_handler(NULL)
+		state(const char* n, const char* local_name, smach* nest = nullptr)
+			: nested(nest), name(n), local_name_(local_name), default_handler(nullptr)
 		{ }
 
 		virtual ~state() { }
@@ -195,8 +208,11 @@ public:
 		//! Sets the default handler
 		void set_default_handler(const typename event_def::funcptr &x) { default_handler=x; }
 
-		//! Returns given the name of the state
-		virtual const char *get_name() const { return name; }
+		//! Returns the name of the state
+		const char* get_name() const override { return name; }
+
+		//! Returns the localized name of the state
+		const char* get_local_name() const override { return _(local_name_); }
 
 		//! Adds an event_def onto the list and then make sure it is sorted correctly.
 		void
@@ -218,8 +234,8 @@ public:
 				high=x.id;
 		}
 
-		typename std::vector<event_def>::iterator find(const event_key &x) { return binary_find(event_list.begin(),event_list.end(),x); }
-		typename std::vector<event_def>::const_iterator find(const event_key &x)const { return binary_find(event_list.begin(),event_list.end(),x); }
+		typename std::vector<event_def>::iterator find(const event_key &x) { return synfig::binary_find(event_list.begin(),event_list.end(),x); }
+		typename std::vector<event_def>::const_iterator find(const event_key &x)const { return synfig::binary_find(event_list.begin(),event_list.end(),x); }
 
 	protected:
 
@@ -267,15 +283,16 @@ public:
 			return new state_context_type(machine_context);
 		}*/
 
-		virtual bool leave_state(void* x)const
+		bool
+		leave_state(void* x) const override
 		{
 			state_context_type* state_context(reinterpret_cast<state_context_type*>(x));
 			delete state_context;
 			return true;
 		}
 
-		virtual event_result
-		process_event(void* x,const event& id)const
+		event_result
+		process_event(void* x, const event& id) const override
 		{
 			state_context_type* state_context(reinterpret_cast<state_context_type*>(x));
 

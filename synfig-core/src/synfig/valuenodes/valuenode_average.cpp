@@ -38,6 +38,7 @@
 #include <synfig/valuenode_registry.h>
 
 #include "valuenode_const.h"
+#include "synfig/general.h"
 
 #include <synfig/canvas.h>
 #include <synfig/valueoperations.h>
@@ -52,7 +53,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Average, RELEASE_VERSION_1_0, "average", "Average")
+REGISTER_VALUENODE(ValueNode_Average, RELEASE_VERSION_1_0, "average", N_("Average"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -91,8 +92,8 @@ ValueNode_Average::create(const ValueBase& value, Canvas::LooseHandle canvas)
 ValueBase
 ValueNode_Average::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 	return ValueAverage::average( ValueNode_DynamicList::operator()(t), ValueBase(), ValueBase(get_type()));
 }
 

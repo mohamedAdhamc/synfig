@@ -53,7 +53,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Stripes, RELEASE_VERSION_0_61_06, "stripes", "Stripes")
+REGISTER_VALUENODE(ValueNode_Stripes, RELEASE_VERSION_0_61_06, "stripes", N_("Stripes"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -61,8 +61,7 @@ REGISTER_VALUENODE(ValueNode_Stripes, RELEASE_VERSION_0_61_06, "stripes", "Strip
 
 synfig::ValueNode_Stripes::ValueNode_Stripes():LinkableValueNode(synfig::type_gradient)
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	set_link("color1",ValueNode_Const::create(Color::alpha()));
 	set_link("color2",ValueNode_Const::create(Color::black()));
 	set_link("stripes",stripes_=ValueNode_Const::create(int(5)));
@@ -101,8 +100,8 @@ synfig::ValueNode_Stripes::~ValueNode_Stripes()
 synfig::ValueBase
 synfig::ValueNode_Stripes::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	const int total((*stripes_)(t).get(int()));
 	int i;
@@ -113,7 +112,7 @@ synfig::ValueNode_Stripes::operator()(Time t)const
 
 	const Color color1((*color1_)(t).get(Color()));
 	const Color color2((*color2_)(t).get(Color()));
-	const float width(std::max(0.0,std::min(1.0,(*width_)(t).get(Real()))));
+	const float width(synfig::clamp((*width_)(t).get(Real()), 0., 1.));
 
 	const float stripe_width_a(width/total);
 	const float stripe_width_b((1.0-width)/total);
@@ -180,22 +179,22 @@ ValueNode_Stripes::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"color1")
+	ret.push_back(ParamDesc("color1")
 		.set_local_name(_("Color 1"))
 		.set_description(_("One color of the gradient stripes"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"color2")
+	ret.push_back(ParamDesc("color2")
 		.set_local_name(_("Color 2"))
 		.set_description(_("Other color of the gradient stripes"))
 	);
 
-		ret.push_back(ParamDesc(ValueBase(),"stripes")
+		ret.push_back(ParamDesc("stripes")
 		.set_local_name(_("Stripe Count"))
 		.set_description(_("Number of stripes in the gradient"))
 	);
 
-		ret.push_back(ParamDesc(ValueBase(),"width")
+		ret.push_back(ParamDesc("width")
 		.set_local_name(_("Width"))
 		.set_description(_("Width of stripes in the gradient between [0,1]"))
 	);

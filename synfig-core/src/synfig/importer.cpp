@@ -45,7 +45,6 @@
 #include "general.h"
 #include <synfig/localization.h>
 
-#include "canvas.h"
 #include "importer.h"
 #include "string.h"
 #include "surface.h"
@@ -59,7 +58,6 @@
 
 /* === G L O B A L S ======================================================= */
 
-using namespace etl;
 using namespace synfig;
 
 Importer::Book* synfig::Importer::book_;
@@ -111,15 +109,14 @@ Importer::open(const FileSystem::Identifier &identifier, bool force)
 		return (*__open_importers)[identifier];
 	}
 
-	if(filename_extension(identifier.filename) == "")
-	{
+	String ext(identifier.filename.extension().u8string());
+	if (ext.empty()) {
 		synfig::error(_("Importer::open(): Couldn't find extension"));
 		return nullptr;
 	}
 
-	String ext(filename_extension(identifier.filename));
-	if (ext.size()) ext = ext.substr(1); // skip initial '.'
-	std::transform(ext.begin(),ext.end(),ext.begin(),&::tolower);
+	ext = ext.substr(1); // skip initial '.'
+	strtolower(ext);
 
 
 	if(!Importer::book().count(ext))
@@ -168,8 +165,10 @@ Importer::get_frame(const RendDesc & /* renddesc */, const Time &time)
 		return last_surface_;
 
 	Surface surface;
-	if(!get_frame(surface, RendDesc(), time))
-		warning(strprintf("Unable to get frame from \"%s\"", identifier.filename.c_str()));
+	if(!get_frame(surface, RendDesc(), time)) {
+		warning(strprintf(_("Unable to get frame from \"%s\" [%s]"), identifier.filename.u8_str(), time.get_string().c_str()));
+		return nullptr;
+	}
 
 	const char *s = getenv("SYNFIG_PACK_IMAGES");
 	if (s == nullptr || atoi(s) != 0)

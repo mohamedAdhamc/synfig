@@ -65,6 +65,21 @@ using namespace synfig;
 
 /* === M A C R O S ========================================================= */
 
+#if defined(__has_cpp_attribute)
+# if __has_cpp_attribute(fallthrough)
+#  define fallthrough__ [[fallthrough]]
+# endif
+#endif
+
+#ifndef fallthrough__
+# if __GNUC__ >= 7
+#  define fallthrough__ __attribute__((fallthrough))
+# elif __clang__
+#  define fallthrough__ [[clang::fallthrough]]
+# else
+#  define fallthrough__ ((void)0)
+# endif
+#endif
 /* === G L O B A L S ======================================================= */
 
 SYNFIG_LAYER_INIT(Advanced_Outline);
@@ -385,12 +400,14 @@ namespace {
 						break;
 					case WidthPoint::TYPE_INNER_PEAK:
 						s = -1;
+						fallthrough__;
 					case WidthPoint::TYPE_PEAK:
 						dst.move_to( Vector(i->first - s*i->second.w, 0) );
 						dst.line_to( Vector(i->first, i->second.w ) );
 						break;
 					case WidthPoint::TYPE_INNER_ROUNDED:
 						s = -1;
+						fallthrough__;
 					case WidthPoint::TYPE_ROUNDED:
 						dst.move_to( Vector(i->first - s*i->second.w, 0) );
 						dst.conic_to(
@@ -434,12 +451,14 @@ namespace {
 						break;
 					case WidthPoint::TYPE_INNER_PEAK:
 						s = -1;
+						fallthrough__;
 					case WidthPoint::TYPE_PEAK:
 						dst.line_to( Vector(i->first + s*i->second.w, 0) );
 						dst.close_mirrored_vert();
 						break;
 					case WidthPoint::TYPE_INNER_ROUNDED:
 						s = -1;
+						fallthrough__;
 					case WidthPoint::TYPE_ROUNDED:
 						dst.conic_to(
 							Vector(i->first + s*i->second.w*round_k0, i->second.w*round_k0),
@@ -464,17 +483,17 @@ namespace {
 Advanced_Outline::Advanced_Outline():
 	param_bline(ValueBase(std::vector<synfig::BLinePoint>())),
 	param_wplist(ValueBase(std::vector<synfig::WidthPoint>())),
-	param_dilist(ValueBase(std::vector<synfig::DashItem>()))
+	param_dilist(ValueBase(std::vector<synfig::DashItem>())),
+	param_start_tip(ValueBase(int(WidthPoint::TYPE_ROUNDED))),
+	param_end_tip(ValueBase(int(WidthPoint::TYPE_ROUNDED))),
+	param_cusp_type(ValueBase(int(TYPE_SHARP))),
+	param_width(ValueBase(Real(1.0f))),
+	param_expand(ValueBase(Real(0))),
+	param_smoothness(ValueBase(Real(1))),
+	param_homogeneous(ValueBase(false)),
+	param_dash_offset(ValueBase(Real(0))),
+	param_dash_enabled(ValueBase(false))
 {
-	param_cusp_type = ValueBase(int(TYPE_SHARP));
-	param_start_tip = param_end_tip = ValueBase(int(WidthPoint::TYPE_ROUNDED));
-	param_width = ValueBase(Real(1.0f));
-	param_expand = ValueBase(Real(0));
-	param_smoothness = ValueBase(Real(1));
-	param_dash_offset = ValueBase(Real(0));
-	param_homogeneous = ValueBase(false);
-	param_dash_enabled = ValueBase(false);
-	
 	clear();
 
 	std::vector<BLinePoint> bline_point_list;
@@ -742,7 +761,7 @@ Advanced_Outline::get_param_vocab()const
 		.set_local_name(_("Expand"))
 		.set_description(_("Value to add to the global width"))
 	);
-	ret.push_back(ParamDesc(ValueBase(),"start_tip")
+	ret.push_back(ParamDesc("start_tip")
 		.set_local_name(_("Tip Type at Start"))
 		.set_description(_("Defines the Tip type of the first spline point when spline is unlooped"))
 		.set_hint("enum")
@@ -754,7 +773,7 @@ Advanced_Outline::get_param_vocab()const
 		.add_enum_value(WidthPoint::TYPE_INNER_ROUNDED,"inner_rounded", _("Inner Rounded Stop"))
 		.add_enum_value(WidthPoint::TYPE_INNER_PEAK,"inner_peak", _("Off-Peak Stop"))
 		);
-	ret.push_back(ParamDesc(ValueBase(),"end_tip")
+	ret.push_back(ParamDesc("end_tip")
 		.set_local_name(_("Tip Type at End"))
 		.set_description(_("Defines the Tip type of the last spline point when spline is unlooped"))
 		.set_hint("enum")
@@ -808,12 +827,21 @@ Advanced_Outline::get_param_vocab()const
 }
 
 bool
-Advanced_Outline::connect_dynamic_param(const String& param, etl::loose_handle<ValueNode> x)
+Advanced_Outline::connect_dynamic_param(const String& param, ValueNode::LooseHandle x)
 {
 	if(param=="bline")
 	{
-		connect_bline_to_wplist(x);
-		connect_bline_to_dilist(x);
+		// only accept a valuenode that gives us a list of blinepoints, or null to disconnect
+		bool is_bline_vn = false;
+		if (x && x->get_type() == type_list) {
+			ValueBase v = (*x)(Time(0));
+			if (v.get_contained_type() == type_bline_point) {
+				is_bline_vn = true;
+			}
+		}
+		if (!x || is_bline_vn) {
+			connect_bline_to_wplist(x);
+		}
 		return Layer::connect_dynamic_param(param, x);
 	}
 	if(param=="wplist")
@@ -823,40 +851,22 @@ Advanced_Outline::connect_dynamic_param(const String& param, etl::loose_handle<V
 			DynamicParamList::const_iterator iter(dynamic_param_list().find("bline"));
 			if(iter==dynamic_param_list().end())
 				return false;
-			else if(!connect_bline_to_wplist(iter->second))
+			else if(iter->second && !connect_bline_to_wplist(iter->second))
 				return false;
 			return true;
 		}
 		else
 			return false;
 	}
-	if(param=="dilist")
-	{
-		if(Layer::connect_dynamic_param(param, x))
-		{
-			DynamicParamList::const_iterator iter(dynamic_param_list().find("bline"));
-			if(iter==dynamic_param_list().end())
-				return false;
-			else if(!connect_bline_to_dilist(iter->second))
-				return false;
-			return true;
-		}
-		else
-			return false;
-	}
+	// no special treatment for param == "dilist"
 
 	return Layer::connect_dynamic_param(param, x);
 }
 
 bool
-Advanced_Outline::connect_bline_to_wplist(etl::loose_handle<ValueNode> x)
+Advanced_Outline::connect_bline_to_wplist(ValueNode::LooseHandle x)
 {
-	if(x->get_type() != type_list)
-		return false;
-	if((*x)(Time(0)).empty())
-		return false;
-	if((*x)(Time(0)).get_list().front().get_type() != type_bline_point)
-		return false;
+	// connect_dynamic_param() makes sure x is a list of blinepoints.
 	ValueNode::LooseHandle vnode;
 	DynamicParamList::const_iterator iter(dynamic_param_list().find("wplist"));
 	if(iter==dynamic_param_list().end())
@@ -867,24 +877,3 @@ Advanced_Outline::connect_bline_to_wplist(etl::loose_handle<ValueNode> x)
 	wplist->set_bline(ValueNode::Handle(x));
 	return true;
 }
-
-bool
-Advanced_Outline::connect_bline_to_dilist(etl::loose_handle<ValueNode> x)
-{
-	if(x->get_type() != type_list)
-		return false;
-	if((*x)(Time(0)).empty())
-		return false;
-	if((*x)(Time(0)).get_list().front().get_type() != type_bline_point)
-		return false;
-	ValueNode::LooseHandle vnode;
-	DynamicParamList::const_iterator iter(dynamic_param_list().find("dilist"));
-	if(iter==dynamic_param_list().end())
-		return false;
-	ValueNode_DIList::Handle dilist(ValueNode_DIList::Handle::cast_dynamic(iter->second));
-	if(!dilist)
-		return false;
-	dilist->set_bline(ValueNode::Handle(x));
-	return true;
-}
-

@@ -67,18 +67,14 @@ using namespace studio;
 
 static LayerGroupTreeStore::Model& ModelHack()
 {
-	static LayerGroupTreeStore::Model* model(0);
-	if(!model)model=new LayerGroupTreeStore::Model;
-	return *model;
+	static LayerGroupTreeStore::Model model;
+	return model;
 }
 
 LayerGroupTreeStore::LayerGroupTreeStore(etl::loose_handle<synfigapp::CanvasInterface> canvas_interface_):
 	Gtk::TreeStore			(ModelHack()),
 	canvas_interface_		(canvas_interface_)
 {
-	layer_icon=Gtk::Button().render_icon_pixbuf(Gtk::StockID("synfig-layer"),Gtk::ICON_SIZE_SMALL_TOOLBAR);
-	group_icon=Gtk::Button().render_icon_pixbuf(Gtk::StockID("synfig-group"),Gtk::ICON_SIZE_SMALL_TOOLBAR);
-
 	// Connect Signals to Terminals
 	canvas_interface()->signal_layer_status_changed().connect(sigc::mem_fun(*this,&studio::LayerGroupTreeStore::on_layer_status_changed));
 	canvas_interface()->signal_layer_new_description().connect(sigc::mem_fun(*this,&studio::LayerGroupTreeStore::on_layer_new_description));
@@ -97,8 +93,8 @@ LayerGroupTreeStore::~LayerGroupTreeStore()
 {
 	//clear();
 
-	if (getenv("SYNFIG_DEBUG_DESTRUCTORS"))
-		synfig::info("LayerGroupTreeStore::~LayerGroupTreeStore(): Deleted");
+	DEBUG_LOG("SYNFIG_DEBUG_DESTRUCTORS",
+		"LayerGroupTreeStore::~LayerGroupTreeStore(): Deleted");
 }
 
 bool
@@ -118,6 +114,18 @@ Glib::RefPtr<LayerGroupTreeStore>
 LayerGroupTreeStore::create(etl::loose_handle<synfigapp::CanvasInterface> canvas_interface_)
 {
 	return Glib::RefPtr<LayerGroupTreeStore>(new LayerGroupTreeStore(canvas_interface_));
+}
+
+// TODO(ice0): duplicated code (search by function name)
+template<typename T>
+static void set_gvalue_tpl(Glib::ValueBase& value, const T &v)
+{
+	Glib::Value<T> x;
+	x.init(x.value_type());
+	x.set(v);
+
+	value.init(x.value_type());
+	value = x;
 }
 
 void
@@ -152,20 +160,15 @@ LayerGroupTreeStore::get_value_vfunc (const Gtk::TreeModel::iterator& iter, int 
 		if((bool)(*iter)[model.is_group])
 		{
 			LayerList layer_list;
-			Gtk::TreeModel::iterator child_iter(iter->children().begin());
-			for(;child_iter;++child_iter)
-			{
-				LayerList layer_list2((LayerList)(*child_iter)[model.all_layers]);
-				//for(;layer_list2.size();layer_list2.pop_front())
-				for(;!layer_list2.empty();layer_list2.pop_front())
-					layer_list.push_back(layer_list2.front());
+			for (const auto& child : iter->children()) {
+				LayerList layer_list2(static_cast<LayerList>(child[model.all_layers]));
+				layer_list.splice(layer_list.end(), layer_list2);
 			}
 			x.set(layer_list);
 		}
 		else if((bool)(*iter)[model.is_layer])
 		{
-			LayerList layer_list;
-			layer_list.push_back((Layer::Handle)(*iter)[model.layer]);
+			LayerList layer_list({static_cast<Layer::Handle>((*iter)[model.layer])});
 			x.set(layer_list);
 		}
 
@@ -297,23 +300,15 @@ LayerGroupTreeStore::get_value_vfunc (const Gtk::TreeModel::iterator& iter, int 
 		g_value_copy(x.gobj(),value.gobj());
 	}
 	else
-	if(column==model.icon.index())
+	if(column==model.icon_name.index())
 	{
-		Glib::Value<Glib::RefPtr<Gdk::Pixbuf> > x;
-		x.init(x.value_type());
-
-		if((bool)(*iter)[model.is_layer])
-		{
-			synfig::Layer::Handle layer((*iter)[model.layer]);
-			if(!layer)return;
-			//x.set(layer_icon);
-			x.set(get_tree_pixbuf_layer(layer->get_name()));
+		if (iter->get_value(model.is_group)) {
+			set_gvalue_tpl<Glib::ustring>(value, "set_icon");
+		} else if (iter->get_value(model.is_layer)) {
+			synfig::Layer::Handle layer(iter->get_value(model.layer));
+			if (!layer) return;
+			set_gvalue_tpl<Glib::ustring>(value, layer_icon_name(layer->get_name()));
 		}
-		if((bool)(*iter)[model.is_group])
-			x.set(group_icon);
-
-		value.init(x.value_type());
-		g_value_copy(x.gobj(),value.gobj());
 	}
 	else
 		Gtk::TreeStore::get_value_vfunc(iter,column,value);
@@ -867,7 +862,7 @@ LayerGroupTreeStore::on_group_changed(synfig::String /*group*/)
 }
 
 void
-LayerGroupTreeStore::on_group_pair_added(synfig::String group, etl::handle<synfig::Layer> layer)
+LayerGroupTreeStore::on_group_pair_added(synfig::String group, synfig::Layer::Handle layer)
 {
 	if(!layer->get_canvas())
 		return;
@@ -884,7 +879,7 @@ LayerGroupTreeStore::on_group_pair_added(synfig::String group, etl::handle<synfi
 }
 
 void
-LayerGroupTreeStore::on_group_pair_removed(synfig::String group, etl::handle<synfig::Layer> layer)
+LayerGroupTreeStore::on_group_pair_removed(synfig::String group, synfig::Layer::Handle layer)
 {
 	if(!layer->get_canvas())
 		return;

@@ -53,7 +53,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_TwoTone, RELEASE_VERSION_0_61_06, "twotone", "Two-Tone")
+REGISTER_VALUENODE(ValueNode_TwoTone, RELEASE_VERSION_0_61_06, "twotone", N_("Two-Tone"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -61,8 +61,7 @@ REGISTER_VALUENODE(ValueNode_TwoTone, RELEASE_VERSION_0_61_06, "twotone", "Two-T
 
 synfig::ValueNode_TwoTone::ValueNode_TwoTone(const ValueBase &value):LinkableValueNode(synfig::type_gradient)
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	if (value.get_type() == type_gradient)
 	{
 		set_link("color1",ValueNode_Const::create(value.get(Gradient())(0)));
@@ -94,8 +93,8 @@ synfig::ValueNode_TwoTone::~ValueNode_TwoTone()
 synfig::ValueBase
 synfig::ValueNode_TwoTone::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	return Gradient((*ref_a)(t).get(Color()),(*ref_b)(t).get(Color()));
 }
@@ -144,12 +143,12 @@ ValueNode_TwoTone::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"color1")
+	ret.push_back(ParamDesc("color1")
 		.set_local_name(_("Color 1"))
 		.set_description(_("The start color of the gradient"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"color2")
+	ret.push_back(ParamDesc("color2")
 		.set_local_name(_("Color 2"))
 		.set_description(_("The end color of the gradient"))
 	);

@@ -70,12 +70,12 @@ public:
 	template<typename TT>
 	inline ConstRef<TT> as() const
 	{
-		TT *p = dynamic_cast<TT*>(pointer);
+		const TT *p = dynamic_cast<const TT*>(pointer);
 		return p ? ConstRef<TT>(*p) : ConstRef<TT>();
 	}
 
 	inline void reset()
-		{ *pointer = NULL; }
+		{ *pointer = nullptr; }
 	inline bool is_valid() const
 		{ return pointer; }
 

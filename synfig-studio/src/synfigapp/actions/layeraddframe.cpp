@@ -36,7 +36,6 @@
 #include <synfig/general.h>
 
 #include "layeraddframe.h"
-#include "layercopy.h"
 #include <synfig/context.h>
 #include <synfigapp/canvasinterface.h>
 #include <synfigapp/instance.h>
@@ -108,9 +107,10 @@ Action::LayerAddFrame::set_param(const synfig::String& name, const Action::Param
 		if (layer_switch)
 		{
 			layer_base = layer_switch->get_current_layer();
-			if (!layer_base) layer_switch = NULL;
+			if (!layer_base)
+				layer_switch = nullptr;
 		}
-		return layer_switch;
+		return static_cast<bool>(layer_switch);
 	}
 	if(name=="time" && param.get_type()==Param::TYPE_TIME)
 	{

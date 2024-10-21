@@ -51,7 +51,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_GradientColor, RELEASE_VERSION_0_61_09, "gradientcolor", "Gradient Color")
+REGISTER_VALUENODE(ValueNode_GradientColor, RELEASE_VERSION_0_61_09, "gradientcolor", N_("Gradient Color"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -60,8 +60,7 @@ REGISTER_VALUENODE(ValueNode_GradientColor, RELEASE_VERSION_0_61_09, "gradientco
 ValueNode_GradientColor::ValueNode_GradientColor(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	if (value.get_type() ==  type_color)
 	{
 		set_link("gradient", ValueNode_Const::create(Gradient(value.get(Color()),value.get(Color()))));
@@ -94,8 +93,8 @@ ValueNode_GradientColor::~ValueNode_GradientColor()
 ValueBase
 ValueNode_GradientColor::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	Real index((*index_)(t).get(Real()));
 	bool loop((*loop_)(t).get(bool()));
@@ -149,17 +148,17 @@ ValueNode_GradientColor::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"gradient")
+	ret.push_back(ParamDesc("gradient")
 		.set_local_name(_("Gradient"))
 		.set_description(_("The gradient where the color is picked from"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"index")
+	ret.push_back(ParamDesc("index")
 		.set_local_name(_("Index"))
 		.set_description(_("The position of the color at the gradient (0,1]"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"loop")
+	ret.push_back(ParamDesc("loop")
 		.set_local_name(_("Loop"))
 		.set_description(_("When checked, the index would loop"))
 	);

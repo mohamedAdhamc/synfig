@@ -551,7 +551,7 @@ software::Blur::IIRCoefficients
 software::Blur::get_iir_coefficients(Real radius)
 {
 	const Real precision(1e-8);
-	radius = max(iir_min_radius + precision, min(iir_max_radius - precision, fabs(radius)));
+	radius = synfig::clamp(fabs(radius), iir_min_radius + precision, iir_max_radius - precision);
 
 	Real x = (radius - iir_min_radius)/iir_radius_step;
 	//int index = floor(x);
@@ -721,8 +721,8 @@ software::Blur::blur(Params params)
 		{ blur_box(params); return; }
 
 	if ( params.type == rendering::Blur::DISC
-      && fabs(params.extra_size[0]) < 8
-      && fabs(params.extra_size[1]) < 8 )
+	  && std::abs(params.extra_size[0]) < 8
+	  && std::abs(params.extra_size[1]) < 8 )
 		{ blur_pattern(params); return; }
 
 	if ( params.type == rendering::Blur::DISC

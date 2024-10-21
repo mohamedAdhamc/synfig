@@ -45,20 +45,17 @@
 #include <synfig/real.h>
 #include <algorithm> // for std::mix/max
 
-#include <ETL/stringf>
-
 #endif
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 
 /* === M A C R O S ========================================================= */
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Range, RELEASE_VERSION_0_61_07, "range", "Range")
+REGISTER_VALUENODE(ValueNode_Range, RELEASE_VERSION_0_61_07, "range", N_("Range"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -67,8 +64,7 @@ REGISTER_VALUENODE(ValueNode_Range, RELEASE_VERSION_0_61_07, "range", "Range")
 synfig::ValueNode_Range::ValueNode_Range(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	Type &type(value.get_type());
 
 	if (type == type_angle)
@@ -130,8 +126,8 @@ synfig::ValueNode_Range::~ValueNode_Range()
 synfig::ValueBase
 synfig::ValueNode_Range::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	if(!min_ || !max_ || !link_)
 		throw std::runtime_error(strprintf("ValueNode_Range: %s",_("Some of my parameters aren't set!")));
@@ -163,13 +159,13 @@ synfig::ValueNode_Range::operator()(Time t)const
 	}
 	else
 	if (type == type_integer)
-		return std::max((*min_)(t).get(int()),  std::min((*max_)(t).get(int()),  (*link_)(t).get(int())));
+		return synfig::clamp((*link_)(t).get(int()), (*min_)(t).get(int()), (*max_)(t).get(int()));
 	else
 	if (type == type_real)
-		return std::max((*min_)(t).get(Real()), std::min((*max_)(t).get(Real()), (*link_)(t).get(Real())));
+		return synfig::clamp((*link_)(t).get(Real()), (*min_)(t).get(Real()), (*max_)(t).get(Real()));
 	else
 	if (type == type_time)
-		return std::max((*min_)(t).get(Time()), std::min((*max_)(t).get(Time()), (*link_)(t).get(Time())));
+		return synfig::clamp((*link_)(t).get(Time()), (*min_)(t).get(Time()), (*max_)(t).get(Time()));
 
 	assert(0);
 	return ValueBase();
@@ -209,14 +205,14 @@ synfig::ValueNode_Range::get_inverse(const Time& t, const synfig::Vector &target
 	{
 		int max_value((*max_)(t).get(int()));
 		int min_value((*min_)(t).get(int()));
-		return std::max(min_value, std::min(max_value, int(target_value.mag())));
+		return synfig::clamp(int(target_value.mag()), min_value, max_value);
 	}
 	else
 	if (type == type_real)
 	{
 		Real max_value((*max_)(t).get(Real()));
 		Real min_value((*min_)(t).get(Real()));
-		return std::max(min_value, std::min(max_value, target_value.mag()));
+		return synfig::clamp(target_value.mag(), min_value, max_value);
 	}
 	else
 	if (type == type_angle)
@@ -224,14 +220,14 @@ synfig::ValueNode_Range::get_inverse(const Time& t, const synfig::Vector &target
 		Angle max_value((*max_)(t).get(Angle()));
 		Angle min_value((*min_)(t).get(Angle()));
 		Angle target_angle(Angle::tan(target_value[1],target_value[0]));
-		return target_angle>max_value?max_value:target_angle<min_value?min_value:target_angle;
+		return synfig::clamp(target_angle, min_value, max_value);
 	}
 	else
 	if (type == type_time)
 	{
 		Real max_value((*max_)(t).get(Time()));
 		Real min_value((*min_)(t).get(Time()));
-		return std::max(min_value, std::min(max_value, target_value.mag()));
+		return synfig::clamp(target_value.mag(), min_value, max_value);
 	}
 
 	return target_value;
@@ -300,17 +296,17 @@ ValueNode_Range::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"min")
+	ret.push_back(ParamDesc("min")
 		.set_local_name(_("Min"))
 		.set_description(_("Returned value when 'Link' is smaller"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"max")
+	ret.push_back(ParamDesc("max")
 		.set_local_name(_("Max"))
 		.set_description(_("Returned value when 'Link' is greater"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"link")
+	ret.push_back(ParamDesc("link")
 		.set_local_name(_("Link"))
 		.set_description(_("The value node to limit its range"))
 	);

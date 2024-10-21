@@ -35,8 +35,6 @@
 #include <glibmm.h>
 #include <cstdio>
 
-#include <ETL/stringf>
-
 #include "filesystem.h"
 
 #endif
@@ -101,9 +99,9 @@ FileSystem::WriteStream::overflow(int character)
 // Identifier
 
 FileSystem::ReadStream::Handle FileSystem::Identifier::get_read_stream() const
-	{ return file_system ? file_system->get_read_stream(filename) : ReadStream::Handle(); }
+	{ return file_system ? file_system->get_read_stream(filename.u8string()) : ReadStream::Handle(); }
 FileSystem::WriteStream::Handle FileSystem::Identifier::get_write_stream() const
-	{ return file_system ? file_system->get_write_stream(filename) : WriteStream::Handle(); }
+	{ return file_system ? file_system->get_write_stream(filename.u8string()) : WriteStream::Handle(); }
 
 
 // FileSystem
@@ -126,7 +124,7 @@ bool FileSystem::file_rename(const String &from_filename, const String &to_filen
 
 bool FileSystem::directory_create_recursive(const String &dirname) {
 	return is_directory(dirname)
-		|| (directory_create_recursive(etl::dirname(dirname)) && directory_create(dirname));
+		|| (directory_create_recursive(filesystem::Path::dirname(dirname)) && directory_create(dirname));
 }
 
 bool FileSystem::remove_recursive(const String &filename)
@@ -185,9 +183,17 @@ bool FileSystem::copy_recursive(Handle from_file_system, const String &from_file
 
 String FileSystem::fix_slashes(const String &filename)
 {
-	String fixed = etl::cleanup_path(filename);
-	if (fixed == ".") fixed = "";
-	for(size_t i = 0; i < fixed.size(); ++i)
+	String fixed = filesystem::Path::cleanup_path(filename);
+	if (fixed == ".")
+		return String();
+
+	String::size_type i = 0;
+	// For MS Windows shared folder paths like \\host\folder\file,
+	// we keep \\ for now
+	if (fixed.size() > 2 && fixed.substr(0, 2) == "\\\\")
+		i = 2;
+	// All other backslashes \ are replaced with slashes /
+	for(; i < fixed.size(); ++i)
 		if (fixed[i] == '\\') fixed[i] = '/';
 	return fixed;
 }
@@ -235,7 +241,6 @@ String FileSystem::get_real_uri(const String & /* filename */)
 String FileSystem::get_real_filename(const String &filename) {
 	return Glib::filename_from_uri(get_real_uri(filename));
 }
-
 
 /* === E N T R Y P O I N T ================================================= */
 

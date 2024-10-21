@@ -837,7 +837,7 @@ inline void Event::calculateSplitEvent()
   for (i = 0; i < activeTable.m_columns.size(); ++i) 
   {
     for (currentContour = activeTable[i]->begin();
-         currentContour != activeTable[i]->end(); currentContour++) 
+		 currentContour != activeTable[i]->end(); ++currentContour)
     {
       // Da spostare sopra il 2o for
       if (activeTable.m_identifiers[(*currentContour)->m_ancestorContour] !=
@@ -1708,7 +1708,7 @@ SkeletonList* studio::skeletonize(Contours &contours, const etl::handle<synfigap
 
 
   for (i = 0; i <contours_size ; ++i) {
-    /* To be enabled in case on isCancenled is implemnted
+    /* To be enabled in case on isCancenled is implemented
         if (thisVectorizer->isCanceled()) break;
     */
     res->push_back(skeletonize(contours[i], context));

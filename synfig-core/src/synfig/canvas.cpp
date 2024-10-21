@@ -45,21 +45,15 @@
 #include "context.h"
 #include "exception.h"
 #include "filesystemnative.h"
-#include "importer.h"
 #include "layer.h"
 #include "loadcanvas.h"
-#include "valuenode_registry.h"
 
-#include "debug/measure.h"
 #include "layers/layer_pastecanvas.h"
-#include "valuenodes/valuenode_const.h"
-#include "valuenodes/valuenode_scale.h"
 #include "rendering/common/task/taskpixelprocessor.h"
 
 #endif
 
 using namespace synfig;
-using namespace etl;
 
 namespace synfig { extern Canvas::Handle open_canvas_as(const FileSystem::Identifier &identifier, const String &as, String &errors, String &warnings); };
 
@@ -103,8 +97,8 @@ Canvas::Canvas(const String &id):
 void
 Canvas::on_changed()
 {
-	if (getenv("SYNFIG_DEBUG_ON_CHANGED"))
-		printf("%s:%d Canvas::on_changed()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_ON_CHANGED",
+		"%s:%d Canvas::on_changed()\n", __FILE__, __LINE__);
 
 	is_dirty_=true;
 	Node::on_changed();
@@ -121,16 +115,11 @@ Canvas::~Canvas()
 	// which deletes the current element from the set we're iterating
 	// through, so we have to make sure we've incremented the iterator
 	// before we mess with the pastecanvas
-	std::set<Node*>::iterator iter = parent_set.begin();
-	while (iter != parent_set.end())
-	{
-		Layer_PasteCanvas* paste_canvas = dynamic_cast<Layer_PasteCanvas*>(*iter);
-		iter++;
-		if(paste_canvas)
-			paste_canvas->set_sub_canvas(nullptr);
-		else
-			warning("destroyed canvas has a parent that is not a pastecanvas - please report if repeatable");
-	}
+	std::vector<Layer_PasteCanvas::Handle> special_parents = find_all_parents_of_type<Layer_PasteCanvas>();
+	for (Layer_PasteCanvas::Handle& paste_canvas : special_parents)
+		paste_canvas->set_sub_canvas(nullptr);
+	if (parent_count() > 0)
+		warning("destroyed canvas has a parent that is not a pastecanvas - please report if repeatable [total %zu]", parent_count());
 
 	//if(is_inline() && parent_) assert(0);
 	_CanvasCounter::counter--;
@@ -151,21 +140,27 @@ Canvas::indexof(const const_iterator &iter) const
 Canvas::iterator
 Canvas::byindex(int index)
 {
-	for(iterator i = begin(); i != end(); ++i, --index)
-		if (!index) return i;
+	if (index >= 0) {
+		for (iterator i = begin(); i != end(); ++i, --index)
+			if (index == 0)
+				return i;
+	}
 	return end();
 }
 
 Canvas::const_iterator
 Canvas::byindex(int index) const
 {
-	for(const_iterator i = begin(); i != end(); ++i, --index)
-		if (!index) return i;
+	if (index >= 0) {
+		for (const_iterator i = begin(); i != end(); ++i, --index)
+			if (index == 0)
+				return i;
+	}
 	return end();
 }
 
 Canvas::iterator
-Canvas::find_index(const etl::handle<Layer> &layer, int &index)
+Canvas::find_index(const Layer::Handle &layer, int &index)
 {
 	index = -1;
 	int idx = 0;
@@ -175,7 +170,7 @@ Canvas::find_index(const etl::handle<Layer> &layer, int &index)
 }
 
 Canvas::const_iterator
-Canvas::find_index(const etl::handle<Layer> &layer, int &index) const
+Canvas::find_index(const Layer::Handle &layer, int &index) const
 {
 	index = -1;
 	int idx = 0;
@@ -397,7 +392,7 @@ Canvas::keyframe_list()const
 	return keyframe_list_;
 }
 
-etl::handle<Layer>
+Layer::Handle
 Canvas::find_layer(const ContextParams &context_params, const Point &pos)
 {
 	return get_context(context_params).hit_check(pos);
@@ -523,7 +518,7 @@ Canvas::get_non_inline_ancestor()const
 }
 
 int
-Canvas::get_depth(etl::handle<Layer> layer)const
+Canvas::get_depth(Layer::Handle layer)const
 {
 	const_iterator iter;
 	int i(0);
@@ -566,20 +561,7 @@ Canvas::_get_relative_id(etl::loose_handle<const Canvas> x)const
 
 	if(x && get_root()!=x->get_root())
 	{
-		//String file_name=get_file_name();
-		//String file_path=x->get_file_path();
-
-		String file_name;
-		if(is_absolute_path(get_file_name()))
-			file_name=etl::relative_path(x->get_file_path(),get_file_name());
-		else
-			file_name=get_file_name();
-
-		// If the path of X is inside of file_name,
-		// then remove it.
-		//if(file_name.size()>file_path.size())
-		//	if(file_path==String(file_name,0,file_path.size()))
-		//		file_name.erase(0,file_path.size()+1);
+		String file_name = filesystem::Path(get_file_name()).proximate_to(x->get_file_path()).u8string();
 
 		id=file_name+'#'+id;
 	}
@@ -757,11 +739,11 @@ Canvas::surefind_canvas(const String &id, String &warnings)
 		String file_name(id,0,id.find_first_of('#'));
 		String external_id(id,id.find_first_of('#')+1);
 
-		file_name=unix_to_local_path(file_name);
+		file_name=FileSystem::fix_slashes(file_name);
 
 		Canvas::Handle external_canvas;
 
-		if(!is_absolute_path(file_name))
+		if(!filesystem::Path::is_absolute_path(file_name))
 			file_name = get_file_path()+ETL_DIRECTORY_SEPARATOR+file_name;
 		// Before look up the external canvases
 		// let's check if this is the current canvas
@@ -790,7 +772,7 @@ Canvas::surefind_canvas(const String &id, String &warnings)
 
 		// Search for the image in the image list,
 		// and return it if it is found
-		for(iter=children().begin();iter!=children().end();iter++)
+		for (iter = children().begin(); iter != children().end(); ++iter)
 			if(id==(*iter)->get_id())
 				return *iter;
 
@@ -846,11 +828,11 @@ Canvas::find_canvas(const String &id, String &warnings)const
 		String file_name(id,0,id.find_first_of('#'));
 		String external_id(id,id.find_first_of('#')+1);
 
-		file_name=unix_to_local_path(file_name);
+		file_name=FileSystem::fix_slashes(file_name);
 
 		Canvas::Handle external_canvas;
 
-		if(!is_absolute_path(file_name))
+		if(!filesystem::Path::is_absolute_path(file_name))
 			file_name = get_file_path()+ETL_DIRECTORY_SEPARATOR+file_name;
 
 		// If the composition is already open, then use it.
@@ -876,7 +858,7 @@ Canvas::find_canvas(const String &id, String &warnings)const
 
 		// Search for the image in the image list,
 		// and return it if it is found
-		for(iter=children().begin();iter!=children().end();iter++)
+		for (iter = children().begin(); iter != children().end(); ++iter)
 			if(id==(*iter)->get_id())
 				return *iter;
 
@@ -906,7 +888,7 @@ Canvas::create()
 }
 
 void
-Canvas::push_back(etl::handle<Layer> x)
+Canvas::push_back(Layer::Handle x)
 {
 //	int i(x->count());
 	insert(end(),x);
@@ -914,7 +896,7 @@ Canvas::push_back(etl::handle<Layer> x)
 }
 
 void
-Canvas::push_front(etl::handle<Layer> x)
+Canvas::push_front(Layer::Handle x)
 {
 //	int i(x->count());
 	insert(begin(),x);
@@ -922,7 +904,7 @@ Canvas::push_front(etl::handle<Layer> x)
 }
 
 void
-Canvas::insert(iterator iter,etl::handle<Layer> x)
+Canvas::insert(iterator iter,Layer::Handle x)
 {
 //	int i(x->count());
 	CanvasBase::insert(iter,x);
@@ -947,7 +929,7 @@ Canvas::insert(iterator iter,etl::handle<Layer> x)
 }
 
 void
-Canvas::push_back_simple(etl::handle<Layer> x)
+Canvas::push_back_simple(Layer::Handle x)
 {
 	CanvasBase::insert(end(),x);
 	changed();
@@ -1018,18 +1000,17 @@ Canvas::clone(const GUID& deriv_guid, bool for_export)const
 		Layer::Handle layer((*iter)->clone(canvas, deriv_guid));
 		if(layer)
 		{
-			assert(layer.count()==1);
+			assert(layer.use_count() == 1);
 			int presize(size());
 			canvas->push_back(layer);
-			if(!(layer.count()>1))
-			{
+			if (layer.use_count() <= 1) {
 				synfig::error("Canvas::clone(): Cloned layer insertion failure!");
-				synfig::error("Canvas::clone(): \tlayer.count()=%d",layer.count());
-				synfig::error("Canvas::clone(): \tlayer->get_name()=%s",layer->get_name().c_str());
-				synfig::error("Canvas::clone(): \tbefore size()=%d",presize);
-				synfig::error("Canvas::clone(): \tafter size()=%d",size());
+				synfig::error("Canvas::clone(): \tlayer.count()=%d", layer.use_count());
+				synfig::error("Canvas::clone(): \tlayer->get_name()=%s", layer->get_name().c_str());
+				synfig::error("Canvas::clone(): \tbefore size()=%d", presize);
+				synfig::error("Canvas::clone(): \tafter size()=%d", size());
 			}
-			assert(layer.count()>1);
+			assert(layer.use_count() > 1);
 		}
 		else
 		{
@@ -1055,7 +1036,7 @@ Canvas::set_inline(LooseHandle parent)
 	is_inline_=true;
 
 	// Have the parent inherit all of the group stuff
-	std::map<String,std::set<etl::handle<Layer> > >::const_iterator iter;
+	std::map<String,std::set<Layer::Handle> >::const_iterator iter;
 	for(iter=group_db_.begin();iter!=group_db_.end();++iter)
 		parent->group_db_[iter->first].insert(iter->second.begin(),iter->second.end());
 	rend_desc()=parent->rend_desc();
@@ -1223,7 +1204,7 @@ Canvas::get_file_path()const
 {
 	if(parent())
 		return parent()->get_file_path();
-	return dirname(file_name_);
+	return filesystem::Path::dirname(file_name_);
 }
 
 FileSystem::Handle
@@ -1300,14 +1281,14 @@ Canvas::get_times_vfunc(Node::time_set &set) const
 	}
 }
 
-std::set<etl::handle<Layer> >
+std::set<Layer::Handle>
 Canvas::get_layers_in_group(const String&group)
 {
 	if(is_inline() && parent_)
 		return parent_->get_layers_in_group(group);
 
 	if(group_db_.count(group)==0)
-		return std::set<etl::handle<Layer> >();
+		return std::set<Layer::Handle>();
 	return group_db_.find(group)->second;
 }
 
@@ -1318,7 +1299,7 @@ Canvas::get_groups()const
 		return parent_->get_groups();
 
 	std::set<String> ret;
-	std::map<String,std::set<etl::handle<Layer> > >::const_iterator iter;
+	std::map<String,std::set<Layer::Handle> >::const_iterator iter;
 	for(iter=group_db_.begin();iter!=group_db_.end();++iter)
 		ret.insert(iter->first);
 	return ret;
@@ -1334,7 +1315,7 @@ Canvas::get_group_count()const
 }
 
 void
-Canvas::add_group_pair(String group, etl::handle<Layer> layer)
+Canvas::add_group_pair(String group, Layer::Handle layer)
 {
 	group_db_[group].insert(layer);
 	if(group_db_[group].size()==1)
@@ -1349,7 +1330,7 @@ Canvas::add_group_pair(String group, etl::handle<Layer> layer)
 }
 
 void
-Canvas::remove_group_pair(String group, etl::handle<Layer> layer)
+Canvas::remove_group_pair(String group, Layer::Handle layer)
 {
 	group_db_[group].erase(layer);
 
@@ -1368,7 +1349,7 @@ Canvas::remove_group_pair(String group, etl::handle<Layer> layer)
 }
 
 void
-Canvas::add_connections(etl::loose_handle<Layer> layer)
+Canvas::add_connections(Layer::LooseHandle layer)
 {
 	LooseHandle correct_canvas(this);
 	//while(correct_canvas->is_inline())correct_canvas=correct_canvas->parent();
@@ -1391,7 +1372,7 @@ Canvas::add_connections(etl::loose_handle<Layer> layer)
 }
 
 void
-Canvas::disconnect_connections(etl::loose_handle<Layer> layer)
+Canvas::disconnect_connections(Layer::LooseHandle layer)
 {
 	for(sigc::connection& connection : connections_[layer])
 		connection.disconnect();
@@ -1414,11 +1395,11 @@ Canvas::rename_group(const String&old_name,const String&new_name)
 	{
 		size_t pos = 0;
 		while ((pos = new_name.find(GROUP_NEST_CHAR, pos)) != std::string::npos) {
-			std::map<String,std::set<etl::handle<Layer> > >::iterator iter;
+			std::map<String,std::set<Layer::Handle> >::iterator iter;
 			String name(new_name, 0, pos);
 			iter=group_db_.find(name);
 			if (iter == group_db_.end()) {
-				group_db_[name] = std::set<etl::handle<Layer> >();
+				group_db_[name] = std::set<Layer::Handle>();
 				signal_group_added()(name);
 			}
 			pos++;
@@ -1429,7 +1410,7 @@ Canvas::rename_group(const String&old_name,const String&new_name)
 	{
 		const std::string old_name_prefix = old_name + GROUP_NEST_CHAR;
 
-		std::map<String,std::set<etl::handle<Layer> > >::iterator iter;
+		std::map<String,std::set<Layer::Handle> >::iterator iter;
 
 		iter=group_db_.find(old_name);
 		if(iter!=group_db_.end()) {
@@ -1442,8 +1423,8 @@ Canvas::rename_group(const String&old_name,const String&new_name)
 		}
 	}
 
-	std::set<etl::handle<Layer> > layers(get_layers_in_group(old_name));
-	std::set<etl::handle<Layer> >::iterator iter;
+	std::set<Layer::Handle> layers(get_layers_in_group(old_name));
+	std::set<Layer::Handle>::iterator iter;
 
 	for(iter=layers.begin();iter!=layers.end();++iter)
 	{
@@ -1453,7 +1434,7 @@ Canvas::rename_group(const String&old_name,const String&new_name)
 	// if empty group, rename it
 	if (layers.size() == 0) {
 		group_db_.erase(group_db_.find(old_name));
-		group_db_[new_name] = std::set<etl::handle<Layer> >();
+		group_db_[new_name] = std::set<Layer::Handle>();
 		signal_group_removed()(old_name);
 		signal_group_added()(new_name);
 	}
@@ -1462,7 +1443,7 @@ Canvas::rename_group(const String&old_name,const String&new_name)
 void
 Canvas::register_external_canvas(String file_name, Handle canvas)
 {
-	if(!is_absolute_path(file_name)) file_name = get_file_path()+ETL_DIRECTORY_SEPARATOR+file_name;
+	if(!filesystem::Path::is_absolute_path(file_name)) file_name = get_file_path()+ETL_DIRECTORY_SEPARATOR+file_name;
 	externals_[file_name] = canvas;
 }
 
@@ -1472,11 +1453,11 @@ Canvas::show_externals(String file, int line, String text) const
 {
 	printf("  .----- (externals for %lx '%s')\n  |  %s:%d %s\n", uintptr_t(this), get_name().c_str(), file.c_str(), line, text.c_str());
 	std::map<String, Handle>::iterator iter;
-	for (iter = externals_.begin(); iter != externals_.end(); iter++)
+	for (iter = externals_.begin(); iter != externals_.end(); ++iter)
 	{
 		synfig::String first(iter->first);
-		etl::loose_handle<Canvas> second(iter->second);
-		printf("  |    %40s : %lx (%d)\n", first.c_str(), uintptr_t(&*second), second->count());
+		Canvas::LooseHandle second(iter->second);
+		printf("  |    %40s : %lx (%d)\n", first.c_str(), uintptr_t(&*second), second->use_count());
 	}
 	printf("  `-----\n\n");
 }
@@ -1487,7 +1468,7 @@ Canvas::show_structure(int i) const
 	if(i==0)
 		printf("---Canvas Structure----\n");
 	IndependentContext iter;
-	for(iter=get_independent_context();*iter;iter++)
+	for (iter = get_independent_context(); *iter; ++iter)
 	{
 		Layer::Handle layer=*iter;
 		printf("%d: %s : %s", i, layer->get_name().c_str(), layer->get_non_empty_description().c_str());
@@ -1497,9 +1478,8 @@ Canvas::show_structure(int i) const
 		else
 			printf(": no composite");
 		printf("\n");
-		if(dynamic_cast<Layer_PasteCanvas*>(layer.get()) != NULL)
+		if(Layer_PasteCanvas* paste_canvas = dynamic_cast<Layer_PasteCanvas*>(layer.get()))
 		{
-			Layer_PasteCanvas* paste_canvas(static_cast<Layer_PasteCanvas*>(layer.get()));
 			paste_canvas->get_sub_canvas()->show_structure(i+1);
 		}
 	}
@@ -1512,23 +1492,22 @@ Canvas::show_structure(int i) const
 // the container is a ValueNode_{Static,Dynamic}List
 // the content is the entry
 void
-Canvas::invoke_signal_value_node_child_removed(etl::handle<ValueNode> container, etl::handle<ValueNode> content)
+Canvas::invoke_signal_value_node_child_removed(ValueNode::Handle container, ValueNode::Handle content)
 {
 	signal_value_node_child_removed()(container, content);
 	Canvas::Handle canvas(this);
 #ifdef DEBUG_INVOKE_SVNCR
-	printf("%s:%d removed stuff from a canvas %lx with %zd parents\n", __FILE__, __LINE__, uintptr_t(canvas.get()), canvas->parent_set.size());
+	printf("%s:%d removed stuff from a canvas %lx with %zu parents\n", __FILE__, __LINE__, uintptr_t(canvas.get()), canvas->parent_count());
 #endif
-	for (std::set<Node*>::iterator iter = canvas->parent_set.begin(); iter != canvas->parent_set.end(); iter++)
-	{
-		if (Layer* layer = dynamic_cast<Layer*>(*iter))
+	auto find_layers_to_invoke_signals = [container, content] (Node* canvas_parent) -> bool {
+		if (Layer* layer = dynamic_cast<Layer*>(canvas_parent))
 		{
 #ifdef DEBUG_INVOKE_SVNCR
 			printf("it's a layer %lx\n", uintptr_t(layer));
-			printf("%s:%d it's a layer with %zd parents\n", __FILE__, __LINE__, layer->parent_set.size());
+			printf("%s:%d it's a layer with %zu parents\n", __FILE__, __LINE__, layer->parent_count());
 #endif
-			for (std::set<Node*>::iterator iter = layer->parent_set.begin(); iter != layer->parent_set.end(); iter++)
-				if (Canvas* canvas = dynamic_cast<Canvas*>(*iter))
+			auto invoke_signal = [container, content] (Node* layer_parent) -> bool {
+				if (Canvas* canvas = dynamic_cast<Canvas*>(layer_parent))
 				{
 #ifdef DEBUG_INVOKE_SVNCR
 					printf("it's a canvas %lx\n", uintptr_t(canvas));
@@ -1549,12 +1528,17 @@ Canvas::invoke_signal_value_node_child_removed(etl::handle<ValueNode> container,
 				else
 					printf("not a canvas\n");
 #endif
+				return false;
+			};
+			layer->foreach_parent(invoke_signal);
 		}
 #ifdef DEBUG_INVOKE_SVNCR
 		else
 			printf("not a layer\n");
 #endif
-	}
+		return false;
+	};
+	canvas->foreach_parent(find_layers_to_invoke_signals);
 }
 
 #if 0
@@ -1569,10 +1553,10 @@ void
 Canvas::show_canvas_ancestry()const
 {
 	String layer;
-	// printf("%s:%d parent set size = %zd\n", __FILE__, __LINE__, parent_set.size());
-	if (parent_set.size() == 1)
+	// printf("%s:%d parent set size = %zu\n", __FILE__, __LINE__, parent_count());
+	if (parent_count() == 1)
 	{
-		Node* node(*(parent_set.begin()));
+		Node* node(get_first_parent()));
 		if (dynamic_cast<Layer*>(node))
 		{
 			layer = (dynamic_cast<Layer*>(node))->get_description();

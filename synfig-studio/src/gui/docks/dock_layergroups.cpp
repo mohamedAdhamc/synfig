@@ -64,6 +64,8 @@ Dock_LayerGroups::Dock_LayerGroups():
 	action_group_group_ops(Gtk::ActionGroup::create("action_group_dock_layergroups")),
 	group_action_manager(new GroupActionManager)
 {
+	set_name("layersets_panel");
+
 	// Make Sets toolbar buttons small for space efficiency
 	get_style_context()->add_class("synfigstudio-efficient-workspace");
 
@@ -99,7 +101,7 @@ Dock_LayerGroups::~Dock_LayerGroups()
 }
 
 void
-Dock_LayerGroups::init_canvas_view_vfunc(etl::loose_handle<CanvasView> canvas_view)
+Dock_LayerGroups::init_canvas_view_vfunc(CanvasView::LooseHandle canvas_view)
 {
 	Glib::RefPtr<LayerGroupTreeStore> layer_group_tree_store;
 	layer_group_tree_store=LayerGroupTreeStore::create(canvas_view->canvas_interface());
@@ -113,7 +115,7 @@ Dock_LayerGroups::init_canvas_view_vfunc(etl::loose_handle<CanvasView> canvas_vi
 }
 
 void
-Dock_LayerGroups::changed_canvas_view_vfunc(etl::loose_handle<CanvasView> canvas_view)
+Dock_LayerGroups::changed_canvas_view_vfunc(CanvasView::LooseHandle canvas_view)
 {
 	if(canvas_view)
 	{

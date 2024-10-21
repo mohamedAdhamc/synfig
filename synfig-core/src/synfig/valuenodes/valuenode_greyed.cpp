@@ -50,7 +50,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Greyed, RELEASE_VERSION_0_62_00, "greyed", "Greyed")
+REGISTER_VALUENODE(ValueNode_Greyed, RELEASE_VERSION_0_62_00, "greyed", N_("Greyed"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -59,13 +59,13 @@ REGISTER_VALUENODE(ValueNode_Greyed, RELEASE_VERSION_0_62_00, "greyed", "Greyed"
 ValueNode_Greyed::ValueNode_Greyed(Type &x):
 	ValueNode_Reference(x)
 {
+	init_children_vocab();
 }
 
 ValueNode_Greyed::ValueNode_Greyed(const ValueNode::Handle &x):
 	ValueNode_Reference(x->get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	set_link("link",x);
 }
 
@@ -91,7 +91,7 @@ ValueNode_Greyed::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"link")
+	ret.push_back(ParamDesc("link")
 		.set_local_name(_("Link"))
 		.set_description(_("The greyed value"))
 	);

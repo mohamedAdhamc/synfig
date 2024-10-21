@@ -42,28 +42,25 @@
 
 #include <algorithm>
 
-#include <ETL/stringf>
-#include <ETL/misc>
-
 #include "general.h"
 #include "real.h"
 
 #include "time.h"
 
 #include <synfig/localization.h>
+#include <synfig/misc.h>
 
 #endif
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
-
-#define tolower ::tolower
 
 /* === M A C R O S ========================================================= */
 
 /* === G L O B A L S ======================================================= */
+
+const Time::value_type Time::epsilon_ = static_cast<Time::value_type>(0.0005);
 
 /* === M E T H O D S ======================================================= */
 
@@ -71,7 +68,7 @@ Time::Time(const String &str_, float fps):
 	value_(0)
 {
 	String str(str_);
-	std::transform(str.begin(),str.end(),str.begin(),&tolower);
+	strtolower(str);
 
 	// Start/Begin Of Time
 	if(str=="sot" || str=="bot")
@@ -214,7 +211,7 @@ Time::get_string(float fps, Time::Format format)const
 
 	if(fps<0)fps=0;
 
-	if(ceil(time.value_)-time.value_<epsilon_())
+	if(ceil(time.value_)-time.value_<epsilon_)
 		time.value_=ceil(time.value_);
 
 	int hour = 0, minute = 0;
@@ -282,12 +279,12 @@ Time::get_string(float fps, Time::Format format)const
 			started = true;
 		}
 
-		if(format<=FORMAT_FULL || std::fabs(frame) > epsilon_() || !started)
+		if(format<=FORMAT_FULL || std::fabs(frame) > epsilon_ || !started)
 		{
 			if (!(format<=FORMAT_NOSPACES) && started)
 				ret += " ";
 
-			if (fabs(frame-floor(frame)) >= epsilon_())
+			if (fabs(frame-floor(frame)) >= epsilon_)
 				ret += strprintf("%0.3ff", frame);
 			else
 				ret += strprintf("%0.0ff", frame);
@@ -302,14 +299,14 @@ Time::get_string(float fps, Time::Format format)const
 			if (!(format<=FORMAT_NOSPACES) && started)
 				ret += " ";
 
-			if(std::fabs(second-floor(second))>=epsilon_())
+			if(std::fabs(second-floor(second))>=epsilon_)
 			{
 				String seconds(strprintf("%0.8f",second));
 
 				// skip trailing zeros
 				int count = 0;
 				String::reverse_iterator i = seconds.rbegin();
-				for ( ; (*i) == '0'; i++)
+				for ( ; (*i) == '0'; ++i)
 					count++;
 
 				// if we removed too many, go back one place, leaving one zero
@@ -333,14 +330,6 @@ Time::round(float fps)const
 	if (!approximate_greater_lp(fps, 0.f)) return *this;
 	return Time(floor(value_*fps + 0.5)/fps);
 }
-
-#ifdef _DEBUG
-const char *
-Time::c_str()const
-{
-	return get_string().c_str();
-}
-#endif
 
 //! \writeme
 bool

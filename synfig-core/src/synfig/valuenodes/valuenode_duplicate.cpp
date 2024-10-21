@@ -50,7 +50,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Duplicate, RELEASE_VERSION_0_61_08, "duplicate", "Duplicate")
+REGISTER_VALUENODE(ValueNode_Duplicate, RELEASE_VERSION_0_61_08, "duplicate", N_("Duplicate"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -60,14 +60,14 @@ ValueNode_Duplicate::ValueNode_Duplicate(Type &x):
 	LinkableValueNode(x),
 	index()
 {
+	init_children_vocab();
 }
 
 ValueNode_Duplicate::ValueNode_Duplicate(const ValueBase &x):
 	LinkableValueNode(x.get_type()),
 	index(1.0)
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	set_link("from", ValueNode_Const::create(Real(1.0)));
 	set_link("to",   ValueNode_Const::create(x.get(Real())));
 	set_link("step", ValueNode_Const::create(Real(1.0)));
@@ -162,8 +162,8 @@ ValueNode_Duplicate::count_steps(Time t)const
 ValueBase
 ValueNode_Duplicate::operator()(Time /*t*/)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	return index;
 }
@@ -185,17 +185,17 @@ ValueNode_Duplicate::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"from")
+	ret.push_back(ParamDesc("from")
 		.set_local_name(_("From"))
 		.set_description(_("Initial value of the index "))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"to")
+	ret.push_back(ParamDesc("to")
 		.set_local_name(_("To"))
 		.set_description(_("Final value of the index"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"step")
+	ret.push_back(ParamDesc("step")
 		.set_local_name(_("Step"))
 		.set_description(_("Amount increment of the index"))
 	);

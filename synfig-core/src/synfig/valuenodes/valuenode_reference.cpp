@@ -50,7 +50,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Reference, RELEASE_VERSION_0_61_06, "reference", "Reference")
+REGISTER_VALUENODE(ValueNode_Reference, RELEASE_VERSION_0_61_06, "reference", N_("Reference"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -59,13 +59,13 @@ REGISTER_VALUENODE(ValueNode_Reference, RELEASE_VERSION_0_61_06, "reference", "R
 ValueNode_Reference::ValueNode_Reference(Type &x):
 	LinkableValueNode(x)
 {
+	init_children_vocab();
 }
 
 ValueNode_Reference::ValueNode_Reference(const ValueNode::Handle &x):
 	LinkableValueNode(x->get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	set_link("link",x);
 }
 
@@ -109,8 +109,8 @@ ValueNode_Reference::get_link_vfunc(int i)const
 ValueBase
 ValueNode_Reference::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	return (*link_)(t);
 }
@@ -134,7 +134,7 @@ ValueNode_Reference::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"link")
+	ret.push_back(ParamDesc("link")
 		.set_local_name(_("Link"))
 		.set_description(_("The referenced value"))
 	);

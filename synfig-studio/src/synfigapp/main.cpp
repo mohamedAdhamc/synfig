@@ -66,7 +66,7 @@ using namespace synfigapp;
 
 /* === S T A T I C S ======================================================= */
 
-static etl::reference_counter synfigapp_ref_count_(0);
+static ReferenceCounter synfigapp_ref_count_(0);
 static synfigapp::Action::Main* action_main;
 
 static Color outline_;
@@ -112,7 +112,7 @@ synfigapp::Main::Main(const synfig::String &rootpath, synfig::ProgressCallback *
 
 #ifdef ENABLE_NLS
 	String locale_dir;
-	locale_dir = rootpath+ETL_DIRECTORY_SEPARATOR+"share"+ETL_DIRECTORY_SEPARATOR+"locale";
+	locale_dir = rootpath+"/share/locale";
 	
 	bindtextdomain(GETTEXT_PACKAGE, Glib::locale_from_utf8(locale_dir).c_str() );
 	bind_textdomain_codeset(GETTEXT_PACKAGE, "UTF-8");
@@ -367,7 +367,7 @@ synfigapp::Main::find_input_device(const synfig::String id)
 	for(iter=input_devices_.begin();iter!=input_devices_.end();++iter)
 		if((*iter)->get_id()==id)
 			return *iter;
-	return 0;
+	return nullptr;
 }
 
 InputDevice::Handle
@@ -375,9 +375,9 @@ synfigapp::Main::select_input_device(const synfig::String id)
 {
 	InputDevice::Handle input_device(find_input_device(id));
 	if(!input_device)
-		return 0;
+		return nullptr;
 	if(!select_input_device(input_device))
-		return 0;
+		return nullptr;
 	return input_device;
 }
 
@@ -412,14 +412,12 @@ synfigapp::Main::set_state(synfig::String state)
 		selected_input_device_->set_state(state);
 }
 
-synfig::String
+synfig::filesystem::Path
 synfigapp::Main::get_user_app_directory()
 {
-	String dir;
-	if (char* synfig_user_settings_dir = getenv("SYNFIG_USER_SETTINGS")) {
-		dir =  Glib::locale_to_utf8(String(synfig_user_settings_dir));
-	} else {
-		dir = Glib::get_home_dir()+ETL_DIRECTORY_SEPARATOR+SYNFIG_USER_APP_DIR;
+	std::string dir = Glib::getenv("SYNFIG_USER_SETTINGS");
+	if (!dir.empty()) {
+		return filesystem::Path(dir);
 	}
-	return dir;
+	return filesystem::Path(Glib::get_home_dir()).append(SYNFIG_USER_APP_DIR);
 }

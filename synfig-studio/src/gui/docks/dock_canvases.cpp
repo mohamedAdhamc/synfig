@@ -66,7 +66,7 @@ Dock_Canvases::Dock_Canvases():
 
 /*  // \todo Implement canvas management in canvas browser
 	add_button(
-		Gtk::StockID("synfig-canvas_new"),
+		("synfig-canvas_new"),
 		_("Insert a new canvas")
 	)->signal_clicked().connect(
 		sigc::mem_fun(
@@ -76,7 +76,7 @@ Dock_Canvases::Dock_Canvases():
 	);
 
 	add_button(
-		Gtk::StockID("gtk-delete"),
+		("_Delete"),
 		_("Remove selected canvas")
 	)->signal_clicked().connect(
 		sigc::mem_fun(
@@ -86,7 +86,7 @@ Dock_Canvases::Dock_Canvases():
 	);
 
 	add_button(
-		Gtk::StockID("synfig-rename"),
+		("synfig-rename"),
 		_("Rename selected canvas")
 	)->signal_clicked().connect(
 		sigc::mem_fun(
@@ -108,15 +108,12 @@ Dock_Canvases::create_canvas_tree()
 	canvas_tree=manage(new class Gtk::TreeView());
 	{
 		Gtk::TreeView::Column* column = Gtk::manage( new Gtk::TreeView::Column(_("ID")) );
-//		Gtk::CellRendererPixbuf* icon_cellrenderer = Gtk::manage( new Gtk::CellRendererPixbuf() );
+		Gtk::CellRendererPixbuf* icon_cellrenderer = Gtk::manage( new Gtk::CellRendererPixbuf() );
 
-		//column->pack_start(*icon_cellrenderer,false);
-		column->pack_start(canvas_tree_model.icon, false); //false = don't expand.
+		column->pack_start(*icon_cellrenderer, false); // false = dont expand.
 		column->pack_start(canvas_tree_model.label);
 
-//#ifdef NDEBUG
-//		column->add_attribute(icon_cellrenderer->property_pixbuf(), canvas_tree_model.icon);
-//#endif
+		column->add_attribute(*icon_cellrenderer, "icon_name", canvas_tree_model.icon_name);
 
 		canvas_tree->append_column(*column);
 	}
@@ -144,7 +141,7 @@ Dock_Canvases::get_selected_canvas_view()
 	return get_selected_instance()->find_canvas_view(get_selected_canvas());
 }
 
-etl::loose_handle<synfig::Canvas>
+Canvas::LooseHandle
 Dock_Canvases::get_selected_canvas()
 {
 	Glib::RefPtr<Gtk::TreeSelection> selection=canvas_tree->get_selection();
@@ -154,7 +151,7 @@ Dock_Canvases::get_selected_canvas()
 
 	studio::Instance::CanvasTreeModel canvas_tree_model;
 
-	return static_cast<etl::handle<synfig::Canvas> >((*selection->get_selected())[canvas_tree_model.canvas]);
+	return static_cast<Canvas::Handle>((*selection->get_selected())[canvas_tree_model.canvas]);
 }
 
 

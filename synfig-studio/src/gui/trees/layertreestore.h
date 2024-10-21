@@ -43,7 +43,7 @@
 
 namespace studio {
 
-class LayerTreeStore : virtual public Gtk::TreeStore
+class LayerTreeStore : public Gtk::TreeStore
 {
 	/*
  -- ** -- P U B L I C   T Y P E S ---------------------------------------------
@@ -60,7 +60,7 @@ public:
 	class Model : public Gtk::TreeModel::ColumnRecord
 	{
 	public:
-		Gtk::TreeModelColumn<Glib::RefPtr<Gdk::Pixbuf> > icon;
+		Gtk::TreeModelColumn<Glib::ustring> icon_name;
 		Gtk::TreeModelColumn<Glib::ustring> label;
 		Gtk::TreeModelColumn<Glib::ustring> name;
 		Gtk::TreeModelColumn<Glib::ustring> id;
@@ -90,7 +90,7 @@ public:
 
 		Model()
 		{
-			add(icon);
+			add(icon_name);
 			add(label);
 			add(name);
 			add(id);
@@ -138,7 +138,6 @@ private:
 
 	etl::loose_handle<synfigapp::CanvasInterface> canvas_interface_;
 
-	Glib::RefPtr<Gdk::Pixbuf> layer_icon;
 
 	/*
  -- ** -- P R I V A T E   M E T H O D S ---------------------------------------
@@ -152,16 +151,16 @@ private:
 
 private:
 	template<typename T>
-	void set_gvalue_tpl(Glib::ValueBase& value, const T &v, bool use_assign_operator = false) const;
+	void set_gvalue_tpl(Glib::ValueBase& value, const T& v, bool use_assign_operator = false) const;
 
-	virtual void  set_value_impl (const Gtk::TreeModel::iterator& row, int column, const Glib::ValueBase& value);
-	virtual void  get_value_vfunc (const Gtk::TreeModel::iterator& iter, int column, Glib::ValueBase& value)const;
+	void set_value_impl(const Gtk::TreeModel::iterator& row, int column, const Glib::ValueBase& value) override;
+	void get_value_vfunc(const Gtk::TreeModel::iterator& iter, int column, Glib::ValueBase& value) const override;
 
-	virtual bool  row_draggable_vfunc (const TreeModel::Path& path)const;
-	virtual bool  drag_data_get_vfunc (const TreeModel::Path& path, Gtk::SelectionData& selection_data)const;
-	virtual bool  drag_data_delete_vfunc (const TreeModel::Path& path);
-	virtual bool  drag_data_received_vfunc (const TreeModel::Path& dest, const Gtk::SelectionData& selection_data);
-	virtual bool  row_drop_possible_vfunc (const TreeModel::Path& dest, const Gtk::SelectionData& selection_data)const;
+	bool row_draggable_vfunc(const TreeModel::Path& path) const override;
+	bool drag_data_get_vfunc(const TreeModel::Path& path, Gtk::SelectionData& selection_data) const override;
+	bool drag_data_delete_vfunc(const TreeModel::Path& path) override;
+	bool drag_data_received_vfunc(const TreeModel::Path& dest, const Gtk::SelectionData& selection_data) override;
+	bool row_drop_possible_vfunc(const TreeModel::Path& dest, const Gtk::SelectionData& selection_data) const override;
 
 	/*
  -- ** -- S I G N A L   T E R M I N A L S -------------------------------------
@@ -238,7 +237,7 @@ public:
 	static int z_sorter(const Gtk::TreeModel::iterator &rhs,const Gtk::TreeModel::iterator &lhs);
 	static int index_sorter(const Gtk::TreeModel::iterator &rhs,const Gtk::TreeModel::iterator &lhs);
 
-	//void set_row_param(Gtk::TreeRow &row,synfig::Layer::Handle &handle,const std::string& name, const std::string& local_name, const synfig::ValueBase &value, etl::handle<synfig::ValueNode> value_node,synfig::ParamDesc *param_desc);
+	//void set_row_param(Gtk::TreeRow &row,synfig::Layer::Handle &handle,const std::string& name, const std::string& local_name, const synfig::ValueBase &value, synfig::ValueNode::Handle value_node,synfig::ParamDesc *param_desc);
 
 	//virtual void set_row(Gtk::TreeRow row,synfigapp::ValueDesc value_desc);
 	static bool search_func(const Glib::RefPtr<TreeModel>&,int,const Glib::ustring&,const TreeModel::iterator&);

@@ -15,6 +15,11 @@ add_subdirectory(plugins)
 add_subdirectory(po)
 add_subdirectory(sounds)
 
+if (${ENABLE_TESTS})
+    enable_testing()
+    add_subdirectory(test)
+endif()
+
 file(MAKE_DIRECTORY "${SYNFIG_BUILD_ROOT}/share/appdata")
 file(MAKE_DIRECTORY "${SYNFIG_BUILD_ROOT}/share/applications")
 
@@ -43,12 +48,12 @@ if(TARGET desktop_file)
     )
 endif()
 
-if(NOT MSVC)
 add_dependencies(synfigstudio
     build_images
     build_pofiles_synfigstudio
 )
 
+if(NOT MSVC)
 if(TARGET plugins_xml)
     add_dependencies(synfigstudio plugins_xml)
 endif()

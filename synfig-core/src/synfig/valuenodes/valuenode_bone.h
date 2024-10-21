@@ -93,7 +93,8 @@ protected:
 public:
 	virtual String get_bone_name(Time t)const;
 
-	ValueNode_Bone::LooseHandle find(String name)const;
+	ValueNode_Bone::LooseHandle find(const String& name)const;
+	static ValueNode_Bone::LooseHandle find(const String& name, etl::loose_handle<Canvas> canvas);
 	String unique_name(String name)const;
 	static void show_bone_map(etl::loose_handle<Canvas> canvas, const char *file, int line, String text, Time t=0);
 	static BoneMap get_bone_map(etl::handle<const Canvas> canvas);
@@ -122,10 +123,10 @@ public:
 	static ValueNode_Bone::Handle get_root_bone();
 
 #ifdef _DEBUG
-	virtual void ref() const override;
-	virtual bool unref() const override;
-	virtual void rref() const override;
-	virtual void runref() const override;
+	void ref() const noexcept override;
+	void unref() const override;
+	void rref() const override;
+	void runref() const override;
 #endif
 
 private:
@@ -162,10 +163,10 @@ public:
 	virtual bool is_root() const override { return true; }
 
 #ifdef _DEBUG
-	virtual void ref() const override;
-	virtual bool unref() const override;
-	virtual void rref() const override;
-	virtual void runref() const override;
+	void ref() const noexcept override;
+	void unref() const override;
+	void rref() const override;
+	void runref() const override;
 #endif
 
 private:

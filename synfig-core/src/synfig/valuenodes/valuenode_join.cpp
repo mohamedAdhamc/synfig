@@ -52,7 +52,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_Join, RELEASE_VERSION_0_61_09, "join", "Joined List")
+REGISTER_VALUENODE(ValueNode_Join, RELEASE_VERSION_0_61_09, "join", N_("Joined List"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -61,8 +61,7 @@ REGISTER_VALUENODE(ValueNode_Join, RELEASE_VERSION_0_61_09, "join", "Joined List
 ValueNode_Join::ValueNode_Join(const ValueBase &value):
 	LinkableValueNode(value.get_type())
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	if (value.get_type() == type_string)
 	{
 		std::vector<ValueBase> v(1, value.get(String()));
@@ -89,7 +88,7 @@ ValueNode_Join::create_new()const
 }
 
 ValueNode_Join*
-ValueNode_Join::create(const ValueBase& x, etl::loose_handle<Canvas>)
+ValueNode_Join::create(const ValueBase& x, Canvas::LooseHandle)
 {
 	return new ValueNode_Join(x);
 }
@@ -102,8 +101,8 @@ ValueNode_Join::~ValueNode_Join()
 ValueBase
 ValueNode_Join::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	const std::vector<ValueBase> strings((*strings_)(t).get_list());
 	const String before((*before_)(t).get(String()));
@@ -178,22 +177,22 @@ ValueNode_Join::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"strings")
+	ret.push_back(ParamDesc("strings")
 		.set_local_name(_("Strings"))
 		.set_description(_("The List of strings to join"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"before")
+	ret.push_back(ParamDesc("before")
 		.set_local_name(_("Before"))
 		.set_description(_("The string to place before the joined strings"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"separator")
+	ret.push_back(ParamDesc("separator")
 		.set_local_name(_("Separator"))
 		.set_description(_("The string to place between each string joined"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"after")
+	ret.push_back(ParamDesc("after")
 		.set_local_name(_("After"))
 		.set_description(_("The string to place after the joined strings"))
 	);

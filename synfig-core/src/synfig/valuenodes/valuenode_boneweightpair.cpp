@@ -53,7 +53,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_BoneWeightPair, RELEASE_VERSION_0_62_00, "boneweightpair", "Bone Weight Pair")
+REGISTER_VALUENODE(ValueNode_BoneWeightPair, RELEASE_VERSION_0_62_00, "boneweightpair", N_("Bone Weight Pair"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -62,6 +62,7 @@ REGISTER_VALUENODE(ValueNode_BoneWeightPair, RELEASE_VERSION_0_62_00, "boneweigh
 ValueNode_BoneWeightPair::ValueNode_BoneWeightPair(const ValueBase &value, Canvas::LooseHandle canvas):
 	LinkableValueNode(value.get_type())
 {
+	init_children_vocab();
 	if (value.get_type() == type_bone_weight_pair)
 	{
 		BoneWeightPair bone_weight_pair(value.get(BoneWeightPair()));
@@ -71,8 +72,8 @@ ValueNode_BoneWeightPair::ValueNode_BoneWeightPair(const ValueBase &value, Canva
 		set_link("bone",ValueNode_Const::create(bone_value_node, canvas));
 		set_link("weight",ValueNode_Const::create(Real(bone_weight_pair.get_weight())));
 
-		if (getenv("SYNFIG_DEBUG_SET_PARENT_CANVAS"))
-			printf("%s:%d set parent canvas for bwp to %p\n", __FILE__, __LINE__, canvas.get());
+		DEBUG_LOG("SYNFIG_DEBUG_SET_PARENT_CANVAS",
+			"%s:%d set parent canvas for bwp to %p\n", __FILE__, __LINE__, canvas.get());
 		set_parent_canvas(canvas);
 
 		ValueNode_Bone::show_bone_map(canvas, __FILE__, __LINE__, "after making new boneweightpair");
@@ -103,8 +104,8 @@ ValueNode_BoneWeightPair::~ValueNode_BoneWeightPair()
 ValueBase
 ValueNode_BoneWeightPair::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	ValueNode_Bone::Handle bone_node((*bone_)(t).get(ValueNode_Bone::Handle()));
 	Bone bone((*bone_node)(t).get(Bone()));
@@ -153,12 +154,12 @@ ValueNode_BoneWeightPair::get_children_vocab_vfunc() const
 {
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"bone")
+	ret.push_back(ParamDesc("bone")
 		.set_local_name(_("Bone"))
 		.set_description(_("Bone used to make influence"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"weight")
+	ret.push_back(ParamDesc("weight")
 		.set_local_name(_("Weight"))
 		.set_description(_("The relative value of influence of the bone"))
 	);

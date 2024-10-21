@@ -52,7 +52,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_GradientRotate, RELEASE_VERSION_0_61_06, "gradient_rotate", "Gradient Rotate")
+REGISTER_VALUENODE(ValueNode_GradientRotate, RELEASE_VERSION_0_61_06, "gradient_rotate", N_("Gradient Rotate"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -61,8 +61,7 @@ REGISTER_VALUENODE(ValueNode_GradientRotate, RELEASE_VERSION_0_61_06, "gradient_
 synfig::ValueNode_GradientRotate::ValueNode_GradientRotate(const Gradient& x):
 	LinkableValueNode(synfig::type_gradient)
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	set_link("gradient",ValueNode_Const::create(x));
 	set_link("offset",ValueNode_Const::create(Real(0)));
 }
@@ -98,8 +97,8 @@ synfig::ValueNode_GradientRotate::~ValueNode_GradientRotate()
 synfig::ValueBase
 synfig::ValueNode_GradientRotate::operator()(Time t)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	Gradient gradient;
 	gradient=(*ref_gradient)(t).get(gradient);
@@ -155,12 +154,12 @@ ValueNode_GradientRotate::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"gradient")
+	ret.push_back(ParamDesc("gradient")
 		.set_local_name(_("Gradient"))
 		.set_description(_("The source gradient to rotate"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"offset")
+	ret.push_back(ParamDesc("offset")
 		.set_local_name(_("Offset"))
 		.set_description(_("The amount to offset the gradient"))
 	);

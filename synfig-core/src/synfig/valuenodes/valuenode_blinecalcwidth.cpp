@@ -42,7 +42,6 @@
 #include <synfig/localization.h>
 #include <synfig/valuenode_registry.h>
 #include <synfig/exception.h>
-#include <ETL/hermite>
 
 #endif
 
@@ -55,7 +54,7 @@ using namespace synfig;
 
 /* === G L O B A L S ======================================================= */
 
-REGISTER_VALUENODE(ValueNode_BLineCalcWidth, RELEASE_VERSION_0_61_08, "blinecalcwidth", "Spline Width")
+REGISTER_VALUENODE(ValueNode_BLineCalcWidth, RELEASE_VERSION_0_61_08, "blinecalcwidth", N_("Spline Width"))
 
 /* === P R O C E D U R E S ================================================= */
 
@@ -64,8 +63,7 @@ REGISTER_VALUENODE(ValueNode_BLineCalcWidth, RELEASE_VERSION_0_61_08, "blinecalc
 ValueNode_BLineCalcWidth::ValueNode_BLineCalcWidth(Type &x):
 	LinkableValueNode(x)
 {
-	Vocab ret(get_children_vocab());
-	set_children_vocab(ret);
+	init_children_vocab();
 	if(x!=type_real)
 		throw Exception::BadType(x.description.local_name);
 
@@ -97,8 +95,8 @@ ValueNode_BLineCalcWidth::~ValueNode_BLineCalcWidth()
 ValueBase
 ValueNode_BLineCalcWidth::operator()(Time t, Real amount)const
 {
-	if (getenv("SYNFIG_DEBUG_VALUENODE_OPERATORS"))
-		printf("%s:%d operator()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_VALUENODE_OPERATORS",
+		"%s:%d operator()\n", __FILE__, __LINE__);
 
 	const ValueBase::List bline = (*bline_)(t).get_list();
 	const ValueBase bline_value_node = (*bline_)(t);
@@ -118,7 +116,7 @@ ValueNode_BLineCalcWidth::operator()(Time t, Real amount)const
 	if (amount > 1) amount = 1;
 	amount *= count;
 
-	int i0 = std::max(0, std::min(size-1, (int)floor(amount)));
+	int i0 = synfig::clamp((int)floor(amount), 0, size-1);
 	int i1 = (i0 + 1) % size;
 	Real part = amount - i0;
 
@@ -183,27 +181,27 @@ ValueNode_BLineCalcWidth::get_children_vocab_vfunc()const
 
 	LinkableValueNode::Vocab ret;
 
-	ret.push_back(ParamDesc(ValueBase(),"bline")
+	ret.push_back(ParamDesc("bline")
 		.set_local_name(_("Spline"))
 		.set_description(_("The spline where the width is linked to"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"loop")
+	ret.push_back(ParamDesc("loop")
 		.set_local_name(_("Loop"))
 		.set_description(_("When checked, the amount would loop"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"amount")
+	ret.push_back(ParamDesc("amount")
 		.set_local_name(_("Amount"))
 		.set_description(_("The position of the linked width on the spline (0,1]"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"scale")
+	ret.push_back(ParamDesc("scale")
 		.set_local_name(_("Scale"))
 		.set_description(_("Scale of the width"))
 	);
 
-	ret.push_back(ParamDesc(ValueBase(),"homogeneous")
+	ret.push_back(ParamDesc("homogeneous")
 		.set_local_name(_("Homogeneous"))
 		.set_description(_("When checked, the width is spline length based"))
 	);

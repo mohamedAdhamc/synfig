@@ -43,11 +43,12 @@
 
 #include <synfigapp/canvasinterface.h>
 #include <synfigapp/main.h>
+#include "synfig/general.h"
+
 #endif
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 using namespace studio;
 
@@ -70,12 +71,12 @@ Dialog_Gradient::Dialog_Gradient():
 	set_role("gradient_editor");
 
 	// Setup the buttons
-	Gtk::Button *cancel_button(manage(new class Gtk::Button(Gtk::StockID("gtk-close"))));
+	Gtk::Button *cancel_button(manage(new Gtk::Button(_("_Close"), true)));
 	cancel_button->show();
 	add_action_widget(*cancel_button,0);
 	cancel_button->signal_clicked().connect(sigc::mem_fun(*this, &Dialog_Gradient::hide));
 
-	set_default_button = manage(new class Gtk::Button(Gtk::StockID(_("Set as Default"))));
+	set_default_button = manage(new Gtk::Button(_("Set as Default")));
 	set_default_button->show();
 	add_action_widget(*set_default_button,2);
 	set_default_button->signal_clicked().connect(sigc::mem_fun(*this, &Dialog_Gradient::on_set_default_pressed));
@@ -139,8 +140,8 @@ Dialog_Gradient::on_set_default_pressed()
 void
 Dialog_Gradient::on_changed()
 {
-	if (getenv("SYNFIG_DEBUG_ON_CHANGED"))
-		printf("%s:%d Dialog_Gradient::on_changed()\n", __FILE__, __LINE__);
+	DEBUG_LOG("SYNFIG_DEBUG_ON_CHANGED",
+		"%s:%d Dialog_Gradient::on_changed()\n", __FILE__, __LINE__);
 
 	signal_edited_(get_gradient());
 }
@@ -162,7 +163,7 @@ Dialog_Gradient::on_values_adjusted()
 }
 
 static void
-dialog_gradient_value_desc_edit(synfig::Gradient /*g*/,synfigapp::ValueDesc /*x*/,handle<synfigapp::CanvasInterface> /*canvas_interface*/)
+dialog_gradient_value_desc_edit(synfig::Gradient /*g*/, synfigapp::ValueDesc /*x*/, etl::handle<synfigapp::CanvasInterface> /*canvas_interface*/)
 {
 //	canvas_interface->connect_value(x,ValueBase(g));
 }

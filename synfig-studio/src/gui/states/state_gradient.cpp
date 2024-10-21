@@ -54,19 +54,14 @@
 
 /* === U S I N G =========================================================== */
 
-using namespace etl;
 using namespace synfig;
 using namespace studio;
 
 /* === M A C R O S ========================================================= */
 
 #ifndef LAYER_CREATION
-#define LAYER_CREATION(button, fun, stockid, tooltip)	\
-	{ \
-		Gtk::Image *icon = manage(new Gtk::Image(Gtk::StockID(stockid), \
-			Gtk::ICON_SIZE_SMALL_TOOLBAR)); \
-		button.add(*icon); \
-	} \
+#define LAYER_CREATION(button, fun, icon_name, tooltip)	\
+	button.set_image_from_icon_name(icon_name, Gtk::BuiltinIconSize::ICON_SIZE_SMALL_TOOLBAR); \
 	button.set_relief(Gtk::RELIEF_NONE); \
 	button.set_tooltip_text(tooltip); \
 	button.signal_toggled().connect(sigc::mem_fun(*this, \
@@ -83,7 +78,7 @@ StateGradient studio::state_gradient;
 
 class studio::StateGradient_Context : public sigc::trackable
 {
-	etl::handle<CanvasView> canvas_view_;
+	CanvasView::Handle canvas_view_;
 	CanvasView::IsWorking is_working;
 
 	Duckmatic::Push duckmatic_push;
@@ -92,7 +87,7 @@ class studio::StateGradient_Context : public sigc::trackable
 
 	Point point_holder;
 
-	etl::handle<Duck> point2_duck;
+	Duck::Handle point2_duck;
 
 	void refresh_ducks();
 
@@ -186,7 +181,7 @@ public:
 
 	~StateGradient_Context();
 
-	const etl::handle<CanvasView>& get_canvas_view()const{return canvas_view_;}
+	const CanvasView::Handle& get_canvas_view()const{return canvas_view_;}
 	etl::handle<synfigapp::CanvasInterface> get_canvas_interface()const{return canvas_view_->canvas_interface();}
 	synfig::Canvas::Handle get_canvas()const{return canvas_view_->get_canvas();}
 	WorkArea * get_work_area()const{return canvas_view_->get_work_area();}
@@ -217,7 +212,7 @@ public:
 /* === M E T H O D S ======================================================= */
 
 StateGradient::StateGradient():
-	Smach::state<StateGradient_Context>("gradient")
+	Smach::state<StateGradient_Context>("gradient", N_("Gradient Tool"))
 {
 	insert(event_def(EVENT_LAYER_SELECTION_CHANGED,&StateGradient_Context::event_layer_selection_changed_handler));
 	insert(event_def(EVENT_STOP,&StateGradient_Context::event_stop_handler));
@@ -372,13 +367,13 @@ StateGradient_Context::StateGradient_Context(CanvasView* canvas_view):
 	layer_types_label.set_valign(Gtk::ALIGN_CENTER);
 
 	LAYER_CREATION(layer_linear_gradient_togglebutton, toggle_layer_linear_gradient,
-		("synfig-layer_gradient_linear"), _("Create a linear gradient"));
+		"layer_gradient_linear_icon", _("Create a linear gradient"));
 	LAYER_CREATION(layer_radial_gradient_togglebutton, toggle_layer_radial_gradient,
-		("synfig-layer_gradient_radial"), _("Create a radial gradient"));
+		"layer_gradient_radial_icon", _("Create a radial gradient"));
 	LAYER_CREATION(layer_conical_gradient_togglebutton, toggle_layer_conical_gradient,
-		("synfig-layer_gradient_conical"), _("Create a conical gradient"));
+		"layer_gradient_conical_icon", _("Create a conical gradient"));
 	LAYER_CREATION(layer_spiral_gradient_togglebutton, toggle_layer_spiral_gradient,
-		("synfig-layer_gradient_spiral"), _("Create a spiral gradient"));
+		"layer_gradient_spiral_icon", _("Create a spiral gradient"));
 
 	layer_linear_gradient_togglebutton.get_style_context()->add_class("indentation");
 	layer_types_box.pack_start(layer_linear_gradient_togglebutton, false, false, 0);
@@ -393,7 +388,7 @@ StateGradient_Context::StateGradient_Context(CanvasView* canvas_view):
 
 	blend_box.pack_start(blend_label, false, false, 0);
 
-	blend_enum.set_param_desc(ParamDesc(Color::BLEND_COMPOSITE,"blend_method")
+	blend_enum.set_param_desc(ParamDesc("blend_method")
 		.set_local_name(_("Blend Method"))
 		.set_description(_("Defines the blend method to be used for gradients")));
 
@@ -650,7 +645,7 @@ StateGradient_Context::event_mouse_click_handler(const Smach::event& x)
 	if(event.key==EVENT_WORKAREA_MOUSE_BUTTON_DOWN && event.button==BUTTON_LEFT)
 	{
 		point_holder=get_work_area()->snap_point_to_grid(event.pos);
-		etl::handle<Duck> duck=new Duck();
+		Duck::Handle duck = new Duck();
 		duck->set_point(point_holder);
 		duck->set_name("p1");
 		duck->set_type(Duck::TYPE_POSITION);
@@ -662,7 +657,7 @@ StateGradient_Context::event_mouse_click_handler(const Smach::event& x)
 		point2_duck->set_type(Duck::TYPE_POSITION);
 		get_work_area()->add_duck(point2_duck);
 
-		handle<Duckmatic::Bezier> bezier(new Duckmatic::Bezier());
+		Duckmatic::Bezier::Handle bezier(new Duckmatic::Bezier());
 		bezier->p1=bezier->c1=duck;
 		bezier->p2=bezier->c2=point2_duck;
 		get_work_area()->add_bezier(bezier);

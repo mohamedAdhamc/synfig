@@ -124,10 +124,8 @@
 #define TARGET(x)														\
 	synfig::Target::book()[synfig::String(x::name__)].factory =			\
 		reinterpret_cast<synfig::Target::Factory> (x::create);			\
-	synfig::Target::book()[synfig::String(x::name__)].filename =		\
+	synfig::Target::book()[synfig::String(x::name__)].file_extension =	\
 		synfig::String(x::ext__);										\
-	synfig::Target::book()[synfig::String(x::name__)].target_param =	\
-		synfig::TargetParam();													\
 	synfig::Target::ext_book()[synfig::String(x::ext__)]=x::name__;
 
 //! Register an additional file extension y for Target class x
@@ -232,9 +230,6 @@ public:
 	typedef Module* (*constructor_type)(ProgressCallback *);
 	//! Type of registered modules: maps Module name to Module handle
 	typedef std::map<String, Handle> Book;
-private:
-	//! Registered modules
-	static Book* book_;
 public:
 	//! The registered modules
 	static Book& book();

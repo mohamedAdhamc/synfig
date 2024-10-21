@@ -141,7 +141,7 @@ Splash::Splash():
 	// Create the splash image
 	Gtk::Image* splash_image = manage(new class Gtk::Image());
 	/* Dual-splash code:
-	srand(time(NULL));
+	srand(time(nullptr));
 	const float ran = rand()/float(RAND_MAX);
 	int number = 1;
 	if(ran >0.499999)
@@ -174,12 +174,12 @@ Splash::Splash():
 	tasklabel->set_size_request(image_w,24);
 	tasklabel->set_use_underline(false);
 
-	// Create the current task label
+	// Create the version label
 	versionlabel = manage(new class Gtk::Label());
 	versionlabel->set_label("" VERSION);
 	versionlabel->set_size_request(image_w,24);
 	versionlabel->set_use_underline(false);
-	versionlabel->override_color(Gdk::RGBA("#FFFFFF"));
+	versionlabel->get_style_context()->add_class("color-white");
 	versionlabel->show();
 
 	// Create the Gtk::Fixed container and put all of the widgets into it
